@@ -1,38 +1,36 @@
-# Iraq Weekly Report System
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-이라크 정치·치안·경제·국제정세 뉴스를 자동 수집하고,
-AI를 활용하여 번역·요약한 뒤 Word 보고서를 생성하는 프로젝트입니다.
+## Getting Started
 
----
+First, run the development server:
 
-## 주요 기능
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
-- 뉴스 자동 수집
-- AI 번역
-- AI 요약
-- 기사 분류
-- Word 보고서 자동 생성
-- 웹 대시보드
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
----
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## 개발 목표
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-회사에서 수행하는 이라크 주간 종합상황보고 작성 업무를
-자동화하여 업무 시간을 단축하고 보고서 품질을 향상시키는 것을 목표로 합니다.
+## Learn More
 
----
+To learn more about Next.js, take a look at the following resources:
 
-## 개발 환경
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-- Python
-- Git
-- GitHub
-- OpenAI API (예정)
-- Word Automation (예정)
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
----
+## Deploy on Vercel
 
-## 개발자
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-Lee Hyun Sik
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
