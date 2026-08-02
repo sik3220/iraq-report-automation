@@ -48,15 +48,15 @@ const articles: Article[] = [
 export default function Home() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-
+  const [selectedCategory, setSelectedCategory] = useState("전체");
   const filteredArticles = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
-
-    if (!keyword) {
-      return articles;
-    }
-
+  
     return articles.filter((article) => {
+      const matchesCategory =
+        selectedCategory === "전체" ||
+        article.category === selectedCategory;
+  
       const searchableText = [
         article.title,
         article.source,
@@ -65,10 +65,13 @@ export default function Home() {
       ]
         .join(" ")
         .toLowerCase();
-
-      return searchableText.includes(keyword);
+  
+      const matchesSearch =
+        !keyword || searchableText.includes(keyword);
+  
+      return matchesCategory && matchesSearch;
     });
-  }, [searchTerm]);
+  }, [searchTerm, selectedCategory]);
   const categoryCounts = useMemo(() => {
     return {
       전체: articles.length,
@@ -108,15 +111,26 @@ export default function Home() {
             </div>
           ))}
         </section>
-        <div className="mb-4">
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="제목·출처·요약 검색"
-            className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          />
-        </div>
+        <div className="mb-4 flex gap-3">
+  <input
+    type="search"
+    value={searchTerm}
+    onChange={(event) => setSearchTerm(event.target.value)}
+    placeholder="제목·출처·요약 검색"
+    className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+  />
+
+  <select
+    value={selectedCategory}
+    onChange={(event) => setSelectedCategory(event.target.value)}
+    className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+  >
+    <option value="전체">전체</option>
+    <option value="정치">정치</option>
+    <option value="안보">안보</option>
+    <option value="경제">경제</option>
+  </select>
+</div>
         <section className="space-y-3">
           {filteredArticles.map((article) => {
             const isSelected = selectedIds.includes(article.id);
