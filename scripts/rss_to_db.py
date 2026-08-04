@@ -1,62 +1,84 @@
 import sqlite3
-import feedparser
 from datetime import datetime
 
-RSS_URL = "https://feeds.bbci.co.uk/news/world/middle_east/rss.xml"
+import feedparser
 
-# RSS 읽기
-feed = feedparser.parse(RSS_URL)
+from news_sources import NEWS_SOURCES
 
-# DB 연결
-conn = sqlite3.connect("data/articles.db")
-cursor = conn.cursor()
 
-saved_count = 0
+DB_PATH = "data/articles.db"
+MAX_ARTICLES_PER_SOURCE = 5
 
-for article in feed.entries[:5]:   # 우선 5개만 저장
 
-    title = article.get("title", "")
-    url = article.get("link", "")
+def save_rss_articles() -> None:
+    connection = sqlite3.connect(DB_PATH)
+    cursor = connection.cursor()
 
-    # 이미 저장된 기사인지 확인
-    cursor.execute(
-        "SELECT id FROM articles WHERE url=?",
-        (url,)
-    )
+    total_saved = 0
 
-    if cursor.fetchone():
-        continue
+    try:
+        for source in NEWS_SOURCES:
+            feed = feedparser.parse(source["url"])
 
-    cursor.execute("""
-        INSERT INTO articles(
-            source,
-            category,
-            title,
-            summary,
-            original,
-            language,
-            published_at,
-            collected_at,
-            url
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
+            saved_for_source = 0
 
-        "BBC",
-        "세계",
-        title,
-        "",
-        "",
-        "en",
-        article.get("published", ""),
-        datetime.now().isoformat(),
-        url
+            for article in feed.entries[:MAX_ARTICLES_PER_SOURCE]:
+                title = article.get("title", "").strip()
+                url = article.get("link", "").strip()
 
-    ))
+                if not title or not url:
+                    continue
 
-    saved_count += 1
+                cursor.execute(
+                    "SELECT id FROM articles WHERE url = ?",
+                    (url,),
+                )
 
-conn.commit()
-conn.close()
+                if cursor.fetchone():
+                    continue
 
-print(f"✅ 새 기사 {saved_count}건 저장 완료")
+                cursor.execute(
+                    """
+                    INSERT INTO articles (
+                        source,
+                        category,
+                        title,
+                        summary,
+                        original,
+                        language,
+                        published_at,
+                        collected_at,
+                        url
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        source["name"],
+                        source["category"],
+                        title,
+                        "",
+                        "",
+                        "en",
+                        article.get("published", ""),
+                        datetime.now().isoformat(),
+                        url,
+                    ),
+                )
+
+                saved_for_source += 1
+                total_saved += 1
+
+            print(
+                f"{source['name']}: 새 기사 {saved_for_source}건 저장"
+            )
+
+        connection.commit()
+
+    finally:
+        connection.close()
+
+    print(f"✅ 전체 새 기사 {total_saved}건 저장 완료")
+
+
+if __name__ == "__main__":
+    save_rss_articles()

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Document,
   Packer,
@@ -19,51 +19,33 @@ type Article = {
   original: string;
 };
 
-const initialArticles: Article[] = [
-  {
-    id: 1,
-    category: "정치",
-    source: "Shafaq News",
-    date: "2026.08.02",
-    title: "8.2, Al-Zaidi 총리, 남은 장관 인선 관련 협의 지속",
-    summary: [
-      "* 시아조정기구와 남은 장관 후보자 확정을 위한 협의를 이어가고 있다고 발표",
-      "☞ 향후 2주 내 신임투표 실시 가능성 제기",
-    ],
-    original: `The Coordination Framework continues consultations regarding the remaining ministerial candidates.
-
-Political sources expect a vote of confidence to be held within the next two weeks.`,
-  },
-  {
-    id: 2,
-    category: "안보",
-    source: "Iraqi PMO",
-    date: "2026.08.02",
-    title: "8.2, 이라크 보안당국, 불법 드론 제조시설 단속 강화",
-    summary: [
-      "* Baghdad 외곽에서 무장단체 관련 시설을 수색하고 드론 장비를 압수",
-    ],
-    original: `أفاد مصدر أمني بأن القوات الأمنية نفذت عملية تفتيش في أطراف بغداد.
-
-وتم ضبط معدات تستخدم في تصنيع الطائرات المسيرة داخل الموقع.`,
-  },
-  {
-    id: 3,
-    category: "경제",
-    source: "Reuters",
-    date: "2026.08.02",
-    title: "8.2, 국제유가, 중동 긴장 완화 기대감으로 소폭 하락",
-    summary: [
-      "* 호르무즈 해협 통항 정상화 기대가 커지며 브렌트유와 WTI가 동반 하락",
-    ],
-    original: `Oil prices edged lower as expectations grew that shipping through the Strait of Hormuz would gradually normalize.
-
-Brent crude and WTI futures both declined.`,
-  },
-];
 
 export default function Home() {
-  const [articles, setArticles] = useState<Article[]>(initialArticles);
+  const [articles, setArticles] = useState<Article[]>([]);
+  useEffect(() => {
+    async function loadArticles() {
+      const response = await fetch("/api/news");
+      const data = await response.json();
+  
+      setArticles(
+        data.articles.map((article: any) => ({
+          id: article.id,
+          category: article.category,
+          source: article.source,
+          date: article.published_at
+            ? article.published_at.slice(0, 10)
+            : "",
+          title: article.title,
+          summary: article.summary
+            ? article.summary.split("\n").filter(Boolean)
+            : [],
+          original: article.original,
+        }))
+      );
+    }
+  
+    loadArticles();
+  }, []);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("전체");
