@@ -4,6 +4,7 @@ from datetime import datetime
 import feedparser
 
 from news_sources import NEWS_SOURCES
+from article_scraper import fetch_article_text
 
 
 DB_PATH = "data/articles.db"
@@ -25,6 +26,11 @@ def save_rss_articles() -> None:
             for article in feed.entries[:MAX_ARTICLES_PER_SOURCE]:
                 title = article.get("title", "").strip()
                 url = article.get("link", "").strip()
+                try:
+                    original = fetch_article_text(url)
+                except Exception as e:
+                    print(f"Error fetching article text: {e}")
+                    original = ""
 
                 if not title or not url:
                     continue
@@ -57,7 +63,7 @@ def save_rss_articles() -> None:
                         source["category"],
                         title,
                         "",
-                        "",
+                        original,
                         "en",
                         article.get("published", ""),
                         datetime.now().isoformat(),
