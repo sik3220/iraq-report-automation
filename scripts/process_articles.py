@@ -1,6 +1,6 @@
 import sqlite3
 
-from ai_processor import summarize_article
+from ai_processor import process_article
 
 
 DB_PATH = "data/articles.db"
@@ -20,7 +20,7 @@ def process_articles() -> None:
                 title,
                 original
             FROM articles
-            WHERE summary = ''
+            WHERE ai_title IS NULL OR ai_title = ''
             ORDER BY collected_at DESC
             LIMIT ?
             """,
@@ -47,16 +47,18 @@ def process_articles() -> None:
                     f"{article['title']}"
                 )
 
-                summary = summarize_article(article_text)
+                ai_title, summary = process_article(article_text)
 
                 cursor.execute(
                     """
                     UPDATE articles
-                    SET summary = ?
+                    SET ai_title = ?,
+                        summary = ?
                     WHERE id = ?
                     """,
                     (
-                        f"* {summary}",
+                        ai_title,
+                        summary,
                         article["id"],
                     ),
                 )

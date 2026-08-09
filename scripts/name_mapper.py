@@ -4,6 +4,8 @@ NAME_MAP = {
     # 미국
     "Donald Trump": "Trump 대통령",
     "Trump": "Trump 대통령",
+    "도널드 트럼프": "Trump 대통령",
+    "트럼프" : "Trump 대통령",
     "Marco Rubio": "Rubio 국무장관",
     "Pete Hegseth": "Hegseth 국방장관",
 
@@ -31,3 +33,10 @@ NAME_MAP = {
     "Recep Tayyip Erdogan": "Erdogan 대통령",
     "Vladimir Putin": "Putin 대통령",
 }
+
+
+def replace_names(text: str) -> str:
+    for old, new in NAME_MAP.items():
+        text = text.replace(old, new)
+
+    return text

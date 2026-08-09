@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from name_mapper import replace_names
 
 
 load_dotenv()
@@ -19,7 +20,7 @@ client = OpenAI(api_key=API_KEY)
 MAX_ARTICLE_LENGTH = 12000
 
 
-def summarize_article(article_text: str) -> str:
+def process_article(article_text: str) -> tuple[str, str]:
     """기사 본문을 한국어 정보보고 형식으로 요약한다."""
 
     cleaned_text = article_text.strip()
@@ -49,15 +50,23 @@ instructions="""
 8. 인명, 기관명, 국가명, 수치는 유지한다.
 9. 핵심 내용을 1~2줄로 작성한다. 핵심만 전달 가능한 경우 한 줄만 작성한다.
 10. 기사에 명확한 전망이 있을 경우에만 마지막 줄에 ☞ 로 작성한다.
-11. 제목은 작성하지 않는다.
-12. 한 문장은 40자 내외로 작성한다.
-13. "언급", "설명", "전했다", "밝혔다"와 같은 전달 표현을 사용하지 않는다.
-14. 주어를 반복하지 말고 사건 중심으로 작성한다.
+11. 한국어 보고서 제목을 한 줄 작성한다.
+12. 제목은 "주체 + 핵심 행위/결과" 중심으로 간결하게 작성한다.
+13. 제목은 40자 내외로 작성한다.
+14. 제목에는 기사에 없는 내용을 추가하지 않는다.
+15. 주요 인물은 정해진 직책 표기를 사용한다.
+16. "~가능성 있음" 대신 문맥에 따라 "~가능성 시사" 또는 "~가능성 고조" 로 작성한다.
+17. 제목에 인물명이 포함된 경우, 핵심 내용에서는 해당 인물명을 반복하지 않는다.
+18. 서로 다른 핵심 사실은 한 문장에 합치지 않고 각각 별도의 핵심 내용으로 작성한다.
+19. "~됨", "~되었음" 등 수동형 종결 표현은 사용하지 않고 "~취소", "~추진", "~합의", "~발표" 등 명사형으로 간결하게 작성한다.
+20. 제목에 이미 포함된 사실은 핵심 내용에서 반복하지 않는다. 핵심 내용에는 제목에 없는 추가 정보만 작성한다.
 
 [출력 형식]
 
+TITLE: 한국어 보고서 제목
+SUMMARY:
 * 핵심 내용
-* 핵심 내용
+* 핵심 내용(필요한 경우)
 """,
     input=f"""
 아래 기사 원문을 정보보고 형식으로 요약하라.
@@ -67,12 +76,23 @@ instructions="""
 """,
     )
 
-    summary = response.output_text.strip()
+    result = response.output_text.strip()
 
-    if not summary:
-        raise ValueError("AI가 빈 요약을 반환했습니다.")
+    if not result:
+        raise ValueError("AI가 빈 결과를 반환했습니다.")
 
-    return summary
+    if "TITLE:" not in result or "SUMMARY:" not in result:
+        raise ValueError("AI 출력 형식이 올바르지 않습니다.")
+
+    title_part, summary_part = result.split("SUMMARY:", 1)
+
+    ai_title = title_part.replace("TITLE:", "").strip()
+    summary = summary_part.strip()
+
+    ai_title = replace_names(ai_title)
+    summary = replace_names(summary)
+
+    return ai_title, summary
 
 
 if __name__ == "__main__":
@@ -82,5 +102,8 @@ He added that planned military strikes had been cancelled while talks
 on a new agreement were progressing.
 """
 
-    result = summarize_article(test_article)
-    print(result)
+    ai_title, summary = process_article(test_article)
+
+    print("제목:", ai_title)
+    print("요약:")
+    print(summary)
