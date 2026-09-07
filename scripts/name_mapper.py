@@ -1,3 +1,5 @@
+import re
+
 # 이름 → 보고서 표기
 
 NAME_MAP = {
@@ -35,8 +37,21 @@ NAME_MAP = {
 }
 
 
-def replace_names(text: str) -> str:
-    for old, new in NAME_MAP.items():
-        text = text.replace(old, new)
+# Country names use Korean even when personal names use English surnames.
+NAME_MAP.update({
+    "Iraq": "이라크", "Iran": "이란", "Oman": "오만",
+    "United States": "미국", "Israel": "이스라엘",
+    "Saudi Arabia": "사우디", "Lebanon": "레바논",
+    "Yemen": "예멘", "Australia": "호주",
+})
+# Match source spellings and already-normalized names in a single pass.
+# Longest alternatives first prevent partial surname matches and repeated titles.
+_NAME_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9])(?:"
+    + "|".join(re.escape(name) for name in sorted(set(NAME_MAP) | set(NAME_MAP.values()), key=len, reverse=True))
+    + r")(?![A-Za-z0-9])"
+)
 
-    return text
+
+def replace_names(text: str) -> str:
+    return _NAME_PATTERN.sub(lambda match: NAME_MAP.get(match.group(0), match.group(0)), text)

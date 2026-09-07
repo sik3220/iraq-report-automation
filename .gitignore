@@ -43,3 +43,5 @@ next-env.d.ts
 # Python
 __pycache__/
 *.pyc
+# Local article backups
+/data/backups/

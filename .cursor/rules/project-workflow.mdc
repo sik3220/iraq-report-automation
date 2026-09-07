@@ -1,0 +1,23 @@
+---
+description: Project-wide development workflow and report-style safeguards
+alwaysApply: true
+---
+
+# Project Workflow
+
+- Inspect the current implementation before making changes.
+- Work on one feature-sized change at a time.
+- Preserve existing behavior and avoid unnecessary rewrites.
+- After changes, run all practical checks such as lint and build.
+- If a check fails, identify and fix the cause, then run the check again.
+- After successful verification, briefly report the changed files and behavior.
+- Do not commit or push before the feature works correctly.
+- Commit or push only after the user confirms the feature works in the UI.
+- Before starting the next feature, briefly explain what will be done.
+- Use plain explanations. Give exact commands only when the user must run them.
+
+# Report Style
+
+- Preserve the previously provided Hyunsik intelligence-report standards for article titles, summaries, reports, and AI prompts.
+- Treat the style guide as higher priority than generic Korean writing conventions.
+- Do not make major changes to report style or AI prompts without first explaining the proposed change to the user.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { normalizeReportLine, summaryLines } from "./report-format";
 import {
   Document,
   Packer,
@@ -15,37 +16,81 @@ type Article = {
   source: string;
   date: string;
   title: string;
+  originalTitle: string;
+  revision: number;
   summary: string[];
   original: string;
 };
 
+type ApiArticle = {
+  id: number;
+  category: Article["category"];
+  source: string;
+  published_at: string | null;
+  title: string;
+  ai_title: string | null;
+  edit_revision: number;
+  summary: string | null;
+  original: string;
+};
+
+const getDisplayTitle = (article: Pick<Article, "title" | "originalTitle">) =>
+  normalizeReportLine(article.title) || article.originalTitle.trim();
 
 export default function Home() {
   const [articles, setArticles] = useState<Article[]>([]);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+
   useEffect(() => {
+    const controller = new AbortController();
+
     async function loadArticles() {
-      const response = await fetch("/api/news");
-      const data = await response.json();
-  
-      setArticles(
-        data.articles.map((article: any) => ({
+      try {
+        const response = await fetch("/api/news", { signal: controller.signal });
+        if (!response.ok) throw new Error("Failed to load articles");
+
+        const data = await response.json();
+        if (!data.success || !Array.isArray(data.articles)) {
+          throw new Error("Invalid articles response");
+        }
+
+        const nextArticles = data.articles.map((article: ApiArticle) => ({
           id: article.id,
           category: article.category,
           source: article.source,
-          date: article.published_at
-            ? article.published_at.slice(0, 10)
-            : "",
-          title: article.title,
+          date: article.published_at ? article.published_at.slice(0, 10) : "",
+          title: normalizeReportLine(article.ai_title || "") || article.title,
+          originalTitle: article.title,
+          revision: article.edit_revision,
           summary: article.summary
-            ? article.summary.split("\n").filter(Boolean)
+            ? summaryLines(article.summary)
             : [],
           original: article.original,
-        }))
-      );
+        }));
+
+        if (!controller.signal.aborted) setArticles(nextArticles);
+      } catch {
+        if (!controller.signal.aborted) {
+          setLoadError("기사를 불러오지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setIsLoading(false);
+      }
     }
-  
-    loadArticles();
-  }, []);
+
+    void loadArticles();
+    return () => controller.abort();
+  }, [loadAttempt]);
+
+  const retryLoad = () => {
+    setIsLoading(true);
+    setLoadError(null);
+    setLoadAttempt((attempt) => attempt + 1);
+  };
+
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("전체");
@@ -54,6 +99,9 @@ export default function Home() {
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editSummary, setEditSummary] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
   const filteredArticles = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
@@ -65,6 +113,7 @@ export default function Home() {
 
       const searchableText = [
         article.title,
+        article.originalTitle,
         article.source,
         article.category,
         ...article.summary,
@@ -72,8 +121,7 @@ export default function Home() {
         .join(" ")
         .toLowerCase();
 
-      const matchesSearch =
-        !keyword || searchableText.includes(keyword);
+      const matchesSearch = !keyword || searchableText.includes(keyword);
 
       return matchesCategory && matchesSearch;
     });
@@ -101,34 +149,56 @@ export default function Home() {
   };
 
   const openEdit = (article: Article) => {
+    setSaveError(null);
+    setSaveNotice(null);
     setEditingArticle(article);
-    setEditTitle(article.title);
+    setEditTitle(getDisplayTitle(article));
     setEditSummary(article.summary.join("\n"));
   };
 
-  const saveEdit = () => {
-    if (!editingArticle) return;
-
-    const newSummary = editSummary
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    setArticles((current) =>
-      current.map((article) =>
-        article.id === editingArticle.id
-          ? {
-              ...article,
-              title: editTitle.trim(),
-              summary: newSummary,
-            }
-          : article,
-      ),
-    );
-
-    setEditingArticle(null);
+  const saveEdit = async () => {
+    if (!editingArticle || isSaving) return;
+    const title = normalizeReportLine(editTitle);
+    if (!title) {
+      setSaveError("제목을 입력해 주세요.");
+      return;
+    }
+    setIsSaving(true);
+    setSaveError(null);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch("/api/news", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          id: editingArticle.id,
+          title,
+          summary: summaryLines(editSummary).join("\n"),
+          expectedRevision: editingArticle.revision,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setSaveError(typeof data.error === "string" ? data.error : "저장하지 못했습니다. 다시 시도해 주세요.");
+        return;
+      }
+      const saved = data.article;
+      setArticles((current) => current.map((article) =>
+        article.id === saved.id
+          ? { ...article, title: saved.ai_title, summary: summaryLines(saved.summary), revision: saved.edit_revision }
+          : article
+      ));
+      setEditingArticle(null);
+      setSaveNotice("수정 내용을 저장했습니다. 새로고침 후에도 유지됩니다.");
+    } catch {
+      setSaveError("저장 결과를 확인하지 못했습니다. 입력 내용을 복사해 두고 다시 시도하거나 새로고침해 주세요.");
+    } finally {
+      clearTimeout(timeout);
+      setIsSaving(false);
+    }
   };
-
   const generateWord = async () => {
     const selectedArticles = articles.filter((article) =>
       selectedIds.includes(article.id),
@@ -158,7 +228,7 @@ export default function Home() {
           spacing: { before: 160, after: 100 },
           children: [
             new TextRun({
-              text: article.title,
+              text: getDisplayTitle(article),
               bold: true,
               size: 22,
             }),
@@ -268,13 +338,43 @@ export default function Home() {
             <option value="경제">경제</option>
             <option value="세계">세계</option>
             <option value="NIC">NIC</option>
-
           </select>
         </div>
 
-        <section className="space-y-3">
+        {saveNotice && (
+          <p role="status" className="mb-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-800">
+            {saveNotice}
+          </p>
+        )}
+        <section className="space-y-3" aria-label="기사 목록" aria-busy={isLoading}>
+          {isLoading && (
+            <p role="status" className="rounded-xl bg-white p-6 text-sm text-slate-600">
+              기사를 불러오는 중입니다…
+            </p>
+          )}
+          {loadError && (
+            <div role="alert" className="rounded-xl border border-red-200 bg-white p-6">
+              <p className="text-sm text-red-700">{loadError}</p>
+              <button
+                type="button"
+                onClick={retryLoad}
+                className="mt-3 rounded-md bg-slate-900 px-4 py-2 text-sm text-white"
+              >
+                다시 시도
+              </button>
+            </div>
+          )}
+          {!isLoading && !loadError && filteredArticles.length === 0 && (
+            <p role="status" className="rounded-xl bg-white p-6 text-sm text-slate-600">
+              {articles.length === 0
+                ? "선정 기준에 맞는 보고서 후보 기사가 없습니다."
+                : "검색 조건에 맞는 기사가 없습니다. 검색어 또는 분류를 변경해 주세요."}
+            </p>
+          )}
           {filteredArticles.map((article) => {
             const isSelected = selectedIds.includes(article.id);
+            const displayTitle = getDisplayTitle(article);
+
 
             return (
               <article
@@ -302,10 +402,10 @@ export default function Home() {
                       <span>{article.date}</span>
                     </div>
 
-                    <h2 className="text-base font-semibold">
-                      {article.title}
-                    </h2>
+                    <h2 className="text-base font-semibold">{displayTitle}</h2>
 
+
+                    {article.summary.length > 0 && (
                     <div className="mt-3 rounded-lg bg-slate-50 px-4 py-3">
                       {article.summary.map((line, index) => (
                         <p
@@ -316,6 +416,7 @@ export default function Home() {
                         </p>
                       ))}
                     </div>
+                    )}
 
                     <div className="mt-3 flex gap-2">
                       <button
@@ -359,8 +460,9 @@ export default function Home() {
                   {originalArticle.source} · {originalArticle.date}
                 </p>
                 <h2 className="mt-1 text-lg font-bold">
-                  {originalArticle.title}
+                  {getDisplayTitle(originalArticle)}
                 </h2>
+
               </div>
 
               <button
@@ -383,17 +485,23 @@ export default function Home() {
           <div className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl">
             <h2 className="mb-4 text-lg font-bold">기사 편집</h2>
 
-            <label className="mb-2 block text-sm font-semibold">제목</label>
+            <label htmlFor="edit-title" className="mb-2 block text-sm font-semibold">제목</label>
             <input
+              id="edit-title"
+              disabled={isSaving}
+              maxLength={200}
               value={editTitle}
               onChange={(event) => setEditTitle(event.target.value)}
               className="mb-4 w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
             />
 
-            <label className="mb-2 block text-sm font-semibold">
+            <label htmlFor="edit-summary" className="mb-2 block text-sm font-semibold">
               보고서 반영 문안
             </label>
             <textarea
+              id="edit-summary"
+              disabled={isSaving}
+              maxLength={10000}
               value={editSummary}
               onChange={(event) => setEditSummary(event.target.value)}
               rows={8}
@@ -406,8 +514,12 @@ export default function Home() {
               반영됩니다.
             </p>
 
+            {saveError && (
+              <p role="alert" className="mt-3 text-sm text-red-700">{saveError}</p>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button
+                disabled={isSaving}
                 onClick={() => setEditingArticle(null)}
                 className="rounded-md border border-slate-300 px-4 py-2 text-sm"
               >
@@ -415,10 +527,11 @@ export default function Home() {
               </button>
 
               <button
+                disabled={isSaving}
                 onClick={saveEdit}
                 className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
               >
-                저장
+                {isSaving ? "저장 중…" : "저장"}
               </button>
             </div>
           </div>

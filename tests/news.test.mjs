@@ -1,0 +1,184 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import vm from "node:vm";
+import { createRequire } from "node:module";
+import ts from "typescript";
+import Database from "better-sqlite3";
+import React from "react";
+
+const loadCommonJs = createRequire(import.meta.url);
+function compiled(file) {
+  return ts.transpileModule(fs.readFileSync(file, "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+}
+const formatting = {};
+vm.runInNewContext(compiled("app/report-format.ts"), { exports: formatting });
+const routeCode = compiled("app/api/news/route.ts");
+
+function fixture(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "iraq-news-test-"));
+  fs.mkdirSync(path.join(root, "data"));
+  const dbPath = path.join(root, "data/articles.db");
+  const db = new Database(dbPath);
+  db.exec(`CREATE TABLE articles (
+    id INTEGER PRIMARY KEY, category TEXT, source TEXT, title TEXT, ai_title TEXT,
+    summary TEXT, original TEXT, published_at TEXT, collected_at TEXT, url TEXT,
+    report_status TEXT, edited_title TEXT, edited_summary TEXT,
+    edit_revision INTEGER NOT NULL DEFAULT 0
+  )`);
+  db.prepare(`INSERT INTO articles(id,title,ai_title,summary,original,report_status)
+    VALUES (?,?,?,?,?,?)`).run(1, "source title", "AI title", "* AI detail", "source body", "included");
+  db.prepare("INSERT INTO articles(id,title,report_status) VALUES (2,'excluded','excluded')").run();
+  db.close();
+  t.after(() => {
+    fs.unlinkSync(dbPath);
+    fs.rmdirSync(path.join(root, "data"));
+    fs.rmdirSync(root);
+  });
+  const exports = {};
+  vm.runInNewContext(routeCode, {
+    exports, require: name => name === "../../report-format" ? formatting : loadCommonJs(name),
+    process: { cwd: () => root }, Response, URL,
+    console: { error() {} },
+  });
+  return { ...exports, dbPath };
+}
+function request(input, headers = {}) {
+  return new Request("http://localhost:3100/api/news", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: JSON.stringify(input),
+  });
+}
+const edit = { id: 1, title: "Saved title.", summary: "* 3.14% increase.\n", expectedRevision: 0 };
+
+test("edits survive a fresh connection and AI regeneration without changing source text", async t => {
+  const api = fixture(t);
+  assert.equal((await api.PATCH(request(edit))).status, 200);
+  let data = await (await api.GET()).json();
+  assert.equal(data.articles[0].ai_title, "Saved title");
+  assert.equal(data.articles[0].summary, "* 3.14% increase");
+  assert.equal(data.articles[0].edit_revision, 1);
+  const db = new Database(api.dbPath);
+  assert.equal(db.prepare("SELECT title FROM articles WHERE id=1").get().title, "source title");
+  assert.equal(db.prepare("SELECT ai_title FROM articles WHERE id=1").get().ai_title, "AI title");
+  db.prepare("UPDATE articles SET ai_title='regenerated', summary='regenerated' WHERE id=1").run();
+  db.close();
+  data = await (await api.GET()).json();
+  assert.equal(data.articles[0].ai_title, "Saved title");
+  assert.equal(data.articles[0].original, "source body");
+  assert.equal(data.count, 1);
+});
+
+test("stale edits cannot overwrite saved text; empty summary is a persistent override", async t => {
+  const api = fixture(t);
+  await api.PATCH(request(edit));
+  assert.equal((await api.PATCH(request({ ...edit, title: "stale" }))).status, 409);
+  const result = await api.PATCH(request({ ...edit, summary: "", expectedRevision: 1 }));
+  assert.equal(result.status, 200);
+  const data = await (await api.GET()).json();
+  assert.equal(data.articles[0].summary, "");
+  assert.equal(data.articles[0].edit_revision, 2);
+});
+
+test("invalid, unknown, excluded and cross-origin writes are rejected", async t => {
+  const api = fixture(t);
+  for (const input of [
+    null, { ...edit, id: -1 }, { ...edit, expectedRevision: 0.5 },
+    { ...edit, title: " ." }, { ...edit, title: "a".repeat(201) },
+    { ...edit, summary: [] },
+  ]) assert.equal((await api.PATCH(request(input))).status, 400);
+  assert.equal((await api.PATCH(request({ ...edit, id: 999 }))).status, 404);
+  assert.equal((await api.PATCH(request({ ...edit, id: 2 }))).status, 404);
+  assert.equal((await api.PATCH(request(edit, { Origin: "https://other.example" }))).status, 403);
+  assert.equal((await api.PATCH(request(edit, { "Content-Type": "text/plain" }))).status, 415);
+  assert.equal((await api.PATCH(new Request("http://localhost:3100/api/news", {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{",
+  }))).status, 400);
+  assert.equal((await (await api.GET()).json()).articles[0].edit_revision, 0);
+});
+
+test("a database failure is reported instead of claiming the edit was saved", async t => {
+  const api = fixture(t);
+  const db = new Database(api.dbPath);
+  db.exec("DROP TABLE articles");
+  db.close();
+  assert.equal((await api.PATCH(request(edit))).status, 500);
+});
+
+test("normalization preserves decimals and removes only terminal periods", () => {
+  assert.equal(formatting.normalizeReportLine("* 3.14%."), "* 3.14%");
+  assert.equal(formatting.normalizeReportLine('* "text."'), '* "text"');
+});
+function findElement(tree, predicate) {
+  if (!tree || typeof tree !== "object") return undefined;
+  if (predicate(tree)) return tree;
+  for (const child of [tree.props?.children].flat(Infinity)) {
+    const found = findElement(child, predicate);
+    if (found) return found;
+  }
+}
+function editor(fetch) {
+  const article = {
+    id: 1, category: "NIC", source: "test", date: "", title: "AI title",
+    originalTitle: "source", original: "body", summary: ["* detail"], revision: 0,
+  };
+  const state = [[article], false];
+  let index = 0;
+  const exports = {};
+  vm.runInNewContext(compiled("app/page.tsx"), {
+    exports, fetch, AbortController, setTimeout, clearTimeout,
+    require: name => name === "./report-format" ? formatting : name === "react" ? {
+      ...React, useEffect() {}, useMemo: fn => fn(),
+      useState(initial) {
+        const slot = index++;
+        if (!(slot in state)) state[slot] = initial;
+        return [state[slot], value => { state[slot] = typeof value === "function" ? value(state[slot]) : value; }];
+      },
+    } : loadCommonJs(name),
+  });
+  const render = () => { index = 0; return exports.default(); };
+  const find = predicate => findElement(render(), predicate);
+  // Open the real edit handler on the rendered article card.
+  const editButton = find(e => e.type === "button" && e.props.onClick && e.props.children !== undefined &&
+    String(e.props.children).includes("편집"));
+  editButton.props.onClick();
+  find(e => e.props?.id === "edit-title").props.onChange({ target: { value: "Manual title." } });
+  find(e => e.props?.id === "edit-summary").props.onChange({ target: { value: "* Manual detail." } });
+  return { find };
+}
+const saveButton = e => e.type === "button" && e.props.children === "저장";
+
+test("editor disables duplicate input while saving and updates the card after success", async () => {
+  let complete;
+  let payload;
+  const ui = editor((_url, options) => {
+    payload = JSON.parse(options.body);
+    return new Promise(resolve => { complete = resolve; });
+  });
+  const saving = ui.find(saveButton).props.onClick();
+  assert.equal(ui.find(e => e.props?.id === "edit-title").props.disabled, true);
+  assert.equal(payload.expectedRevision, 0);
+  assert.equal(payload.title, "Manual title");
+  assert.equal(payload.summary, "* Manual detail");
+  complete(Response.json({ success: true, article: {
+    id: 1, ai_title: payload.title, summary: payload.summary, edit_revision: 1,
+  } }));
+  await saving;
+  assert.equal(ui.find(e => e.props?.id === "edit-title"), undefined);
+  assert.ok(ui.find(e => e.type === "h2" && e.props.children === "Manual title"));
+  assert.ok(ui.find(e => e.props?.role === "status"));
+});
+
+test("editor preserves draft text and stays open after a save failure", async () => {
+  const ui = editor(async () => Response.json({ success: false, error: "disk unavailable" }, { status: 500 }));
+  await ui.find(saveButton).props.onClick();
+  assert.equal(ui.find(e => e.props?.id === "edit-title").props.value, "Manual title.");
+  assert.equal(ui.find(e => e.props?.id === "edit-summary").props.value, "* Manual detail.");
+  assert.equal(ui.find(saveButton).props.disabled, false);
+  assert.equal(ui.find(e => e.props?.role === "alert").props.children, "disk unavailable");
+});
