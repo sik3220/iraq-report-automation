@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 REQUEST_TIMEOUT = 15
 MIN_PARAGRAPH_LENGTH = 40
+MIN_ARTICLE_LENGTH = 200
 
 # 기사 본문이 아닌 문구를 제거하기 위한 키워드
 EXCLUDED_TEXTS = (
@@ -18,6 +19,8 @@ EXCLUDED_TEXTS = (
     "Follow BBC",
     "Watch our pick",
     "Calls for information",
+    "ليصلك المزيد من الأخبار",
+    "اشترك بقناتنا",
     "Related topics",
     "Related stories",
 )
@@ -53,7 +56,8 @@ def fetch_article_text(url: str) -> str:
             "(Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 "
             "Chrome/142.0 Safari/537.36"
-        )
+        ),
+        "Accept-Language": "ar,en;q=0.9",
     }
 
     response = requests.get(
@@ -80,6 +84,7 @@ def fetch_article_text(url: str) -> str:
         element.decompose()
 
     paragraphs: list[str] = []
+    used_story_fallback = False
 
     for paragraph in soup.find_all("p"):
         text = clean_text(
@@ -89,10 +94,26 @@ def fetch_article_text(url: str) -> str:
         if is_valid_paragraph(text):
             paragraphs.append(text)
 
+    # INA 기사 중 일부는 일반적인 <p> 문단 대신
+    # `.box.story.fullstory` 컨테이너 안에 텍스트 블록을 직접 둔다.
+    # 해당 컨테이너가 있고 기존 추출 결과가 짧을 때만 보조 경로로 사용한다.
+    if len("\n\n".join(paragraphs)) < MIN_ARTICLE_LENGTH:
+        story = soup.select_one(".box.story.fullstory")
+        if story:
+            used_story_fallback = True
+            for line in story.get_text("\n", strip=True).splitlines():
+                text = clean_text(line)
+                if is_valid_paragraph(text):
+                    paragraphs.append(text)
+
     # 중복 문단 제거
     unique_paragraphs = list(dict.fromkeys(paragraphs))
 
-    return "\n\n".join(unique_paragraphs)
+    article_text = "\n\n".join(unique_paragraphs)
+    minimum_length = 80 if used_story_fallback else MIN_ARTICLE_LENGTH
+    if len(article_text) < minimum_length:
+        raise ValueError("기사 본문을 충분히 확보하지 못함")
+    return article_text
 
 
 if __name__ == "__main__":

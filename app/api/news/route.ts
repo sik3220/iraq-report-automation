@@ -4,20 +4,38 @@ import { normalizeReportLine, summaryLines } from "../../report-format";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+function currentReportWeek() {
+  const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Baghdad", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const start = new Date(`${date}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - (start.getUTCDay() + 3) % 7);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 6);
+  return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+}
+
+export async function GET(request: Request) {
   const dbPath = path.join(process.cwd(), "data", "articles.db");
   let db: Database.Database | undefined;
   try {
     db = new Database(dbPath, { readonly: true });
+    const period = currentReportWeek();
+    const archive = new URL(request.url).searchParams.get("period") === "archive";
+    const periodFilter = archive ? "week_start < ?" : "week_start = ?";
+    const needsBody = db.prepare("SELECT id, source, title, url, report_date, edit_revision FROM articles WHERE report_status = 'review' AND COALESCE(original, '') = '' AND week_start = ? ORDER BY report_date DESC").all(period.start);
     const articles = db.prepare(
       `SELECT id, category, source, title,
         COALESCE(edited_title, ai_title) AS ai_title,
         COALESCE(edited_summary, summary) AS summary,
-        edit_revision, original, published_at, collected_at, url
-       FROM articles WHERE report_status = 'included'
+        edit_revision, original, published_at, report_date, collected_at, url
+       FROM articles WHERE report_status = 'included' AND ${periodFilter}
        ORDER BY collected_at DESC`
-    ).all();
-    return Response.json({ success: true, count: articles.length, articles });
+    ).all(period.start);
+    const summaryRows = db.prepare("SELECT report_status AS status, COUNT(*) AS count FROM articles WHERE week_start = ? GROUP BY report_status").all(period.start) as Array<{ status: string; count: number }>;
+    const summary: Record<string, number> = {};
+    summaryRows.forEach((row) => { summary[row.status] = row.count; });
+    const testData = db.prepare("SELECT COUNT(*) AS count FROM articles WHERE url = 'https://test.com' AND report_status = 'excluded'").get() as { count: number };
+    const sources = db.prepare<[], { source_id: string; name: string; status: string; note: string | null; checked_at: string | null; counts: string | null }>("SELECT source_id, name, status, note, checked_at, counts FROM source_checks ORDER BY name").all().map((row: { source_id: string; name: string; status: string; note: string | null; checked_at: string | null; counts: string | null }) => ({ ...row, counts: row.counts ? JSON.parse(row.counts) : {} }));
+    return Response.json({ success: true, count: articles.length, articles, needsBody, meta: { reportPeriod: period, summary, testDataCount: testData.count, sources } });
   } catch (error) {
     console.error("Failed to load articles:", error);
     return Response.json(
@@ -43,6 +61,16 @@ export async function PATCH(request: Request) {
     input = await request.json();
   } catch {
     return Response.json({ success: false, error: "저장 요청을 읽지 못했습니다." }, { status: 400 });
+  }
+  if (input?.action === "provide_body") {
+    if (!Number.isSafeInteger(input.id) || input.id < 1 || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0 || typeof input.body !== "string" || input.body.trim().length < 100 || input.body.length > 100000) {
+      return Response.json({ success: false, error: "기사 본문을 100~100,000자로 입력해 주세요." }, { status: 400 });
+    }
+    const connection = new Database(path.join(process.cwd(), "data", "articles.db"), { fileMustExist: true });
+    try {
+      const result = connection.prepare("UPDATE articles SET original = ?, report_status = 'pending', report_reason = '사용자 본문 입력 — 분석 대기', edit_revision = edit_revision + 1 WHERE id = ? AND edit_revision = ? AND report_status = 'review' AND COALESCE(original, '') = ''").run(input.body.trim(), input.id, input.expectedRevision);
+      return Response.json({ success: result.changes === 1, error: result.changes ? undefined : "기사 상태가 변경됐습니다. 새로고침 후 확인해 주세요." }, { status: result.changes ? 200 : 409 });
+    } finally { connection.close(); }
   }
   if (
     !input || typeof input !== "object" ||
@@ -99,3 +127,9 @@ export async function PATCH(request: Request) {
     db?.close();
   }
 }
+
+
+
+
+
+

@@ -10,6 +10,7 @@ from ai_processor import parse_report
 from init_db import ensure_schema
 from name_mapper import replace_names
 from report_style import normalize_summary
+from dedupe_review_articles import same_event
 import process_articles as batch
 
 
@@ -20,6 +21,22 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(replace_names(text), expected)
         self.assertEqual(replace_names(expected), expected)
         self.assertEqual(replace_names("Trumpet"), "Trumpet")
+        self.assertEqual(replace_names("Zaydi 총리"), "Al-Zaidi 총리")
+        self.assertEqual(replace_names("Halbousi 국회의장, Maliki 전 총리, Sudani 전 총리"), "Al-Halbousi 국회의장, Al-Maliki 전 총리, Al-Sudani 전 총리")
+
+    def test_pre_ai_excludes_routine_incidents(self):
+        self.assertEqual(batch.pre_ai_exclusion_reason("farmers detained in Lebanon"), "국지적 개인 구금 사건")
+        self.assertEqual(batch.pre_ai_exclusion_reason("السفارة تتابع الاعتداء على الطلبة"), "개별 유학생 피습·영사 대응")
+        self.assertIsNone(batch.pre_ai_exclusion_reason("العراق يوسع الاستثمار في الطاقة"))
+
+    def test_duplicate_event_requires_four_meaningful_shared_words(self):
+        self.assertTrue(same_event(
+            "US military strikes three Iranian crude oil carriers",
+            "U.S. strikes three Iranian shadow network oil tankers",
+        ))
+        self.assertFalse(same_event(
+            "Israeli strikes southern Lebanon", "Israel releases Lebanese prisoners after talks",
+        ))
 
     def test_country_names_and_missing_body(self):
         self.assertEqual(replace_names("Iran, Oman 협의"), "이란, 오만 협의")

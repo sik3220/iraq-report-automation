@@ -22,11 +22,13 @@ type Article = {
   original: string;
 };
 
+type DashboardMeta = { reportPeriod: { start: string; end: string }; summary: Record<string, number>; testDataCount: number; sources: Array<{ source_id: string; name: string; status: string; note: string | null; checked_at: string | null; counts: Record<string, number> }> };
 type ApiArticle = {
   id: number;
   category: Article["category"];
   source: string;
   published_at: string | null;
+  report_date: string | null;
   title: string;
   ai_title: string | null;
   edit_revision: number;
@@ -37,8 +39,40 @@ type ApiArticle = {
 const getDisplayTitle = (article: Pick<Article, "title" | "originalTitle">) =>
   normalizeReportLine(article.title) || article.originalTitle.trim();
 
+const sourceStatusLabel = (status: string) => ({
+  ok: "정상", disabled: "비활성", stale: "오래된 피드", unchecked: "미확인",
+  metadata: "제목 수집", error: "연결 오류",
+})[status] || "확인 필요";
+
+const sourceStatusStyle = (status: string) => {
+  if (status === "ok") return "bg-green-100 text-green-800";
+  if (status === "disabled" || status === "unchecked") {
+    return "bg-slate-200 text-slate-700";
+  }
+  return "bg-amber-100 text-amber-800";
+};
+
+type BodyRequest = { id: number; title: string; source: string; url: string; report_date: string; edit_revision: number };
 export default function Home() {
+  const [needsBody, setNeedsBody] = useState<BodyRequest[]>([]);
+  const [bodyArticle, setBodyArticle] = useState<BodyRequest | null>(null);
+  const [bodyText, setBodyText] = useState("");
+  const [bodyError, setBodyError] = useState("");
+  const [bodySaving, setBodySaving] = useState(false);
+  async function saveBody() {
+    if (!bodyArticle || bodySaving) return;
+    setBodySaving(true); setBodyError("");
+    try {
+      const response = await fetch("/api/news", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "provide_body", id: bodyArticle.id, expectedRevision: bodyArticle.edit_revision, body: bodyText }), signal: AbortSignal.timeout(15000) });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "저장 실패");
+      setBodyArticle(null); setBodyText(""); retryLoad();
+    } catch (error) { setBodyError(error instanceof Error ? error.message : "저장 실패"); }
+    finally { setBodySaving(false); }
+  }
+  const [periodView, setPeriodView] = useState("current");
   const [articles, setArticles] = useState<Article[]>([]);
+  const [dashboardMeta, setDashboardMeta] = useState<DashboardMeta | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -49,7 +83,7 @@ export default function Home() {
 
     async function loadArticles() {
       try {
-        const response = await fetch("/api/news", { signal: controller.signal });
+        const response = await fetch(`/api/news?period=${periodView}`, { signal: controller.signal });
         if (!response.ok) throw new Error("Failed to load articles");
 
         const data = await response.json();
@@ -61,7 +95,7 @@ export default function Home() {
           id: article.id,
           category: article.category,
           source: article.source,
-          date: article.published_at ? article.published_at.slice(0, 10) : "",
+          date: article.report_date || "게시일 미확인",
           title: normalizeReportLine(article.ai_title || "") || article.title,
           originalTitle: article.title,
           revision: article.edit_revision,
@@ -71,7 +105,11 @@ export default function Home() {
           original: article.original,
         }));
 
-        if (!controller.signal.aborted) setArticles(nextArticles);
+        if (!controller.signal.aborted) {
+          setArticles(nextArticles);
+          setDashboardMeta(data.meta || null);
+          setNeedsBody(data.needsBody || []);
+        }
       } catch {
         if (!controller.signal.aborted) {
           setLoadError("기사를 불러오지 못했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.");
@@ -83,7 +121,7 @@ export default function Home() {
 
     void loadArticles();
     return () => controller.abort();
-  }, [loadAttempt]);
+  }, [loadAttempt, periodView]);
 
   const retryLoad = () => {
     setIsLoading(true);
@@ -168,7 +206,7 @@ export default function Home() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     try {
-      const response = await fetch("/api/news", {
+      const response = await fetch(`/api/news?period=${periodView}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
@@ -305,6 +343,47 @@ export default function Home() {
           </p>
         </header>
 
+        {dashboardMeta && (
+          <section className="mb-6 space-y-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4"><p className="text-xs font-semibold text-blue-700">현재 보고 기간</p><p className="mt-1 text-lg font-bold text-blue-950">{dashboardMeta.reportPeriod.start} ~ {dashboardMeta.reportPeriod.end}</p><p className="mt-1 text-xs text-blue-800">목요일~수요일 · 바그다드 시간 기준</p></div>
+            <div className="grid gap-3 md:grid-cols-4">{[["보고서 후보", dashboardMeta.summary.included || 0], ["분석 대기", dashboardMeta.summary.pending || 0], ["자동 처리 대기", dashboardMeta.summary.review || 0], ["제외·중복", (dashboardMeta.summary.excluded || 0) + (dashboardMeta.summary.duplicate || 0)]].map(([label, count]) => <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold">{count}</p></div>)}</div>
+            {dashboardMeta.testDataCount > 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">확인된 시험 기사 {dashboardMeta.testDataCount}건(test.com)은 제외 상태입니다. 실제 출처에서 시험 수집한 기사와는 구분됩니다.</p>}
+            <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+              <summary className="cursor-pointer text-sm font-semibold">출처 수집 상태 · {dashboardMeta.sources.length}개</summary>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {dashboardMeta.sources.map((source) => (
+                  <details key={source.source_id} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                    <summary className="cursor-pointer list-none whitespace-nowrap">
+                      <span className="mr-2 font-medium">{source.name}</span>
+                      <span className={`rounded px-2 py-1 text-xs ${sourceStatusStyle(source.status)}`}>
+                        {sourceStatusLabel(source.status)}
+                      </span>
+                    </summary>
+                    <div className="mt-3 max-w-sm border-t border-slate-200 pt-2 text-xs leading-5 text-slate-600">
+                      {source.note && <p>{source.note}</p>}
+                      <p>{source.checked_at ? `마지막 확인: ${source.checked_at}` : "수집 확인 기록 없음"}</p>
+                      {Object.keys(source.counts).length > 0 && (
+                        <p>수집 결과: {Object.entries(source.counts).map(([key, count]) => `${key} ${count}`).join(" · ")}</p>
+                      )}
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </details>
+          </section>
+        )}
+
+        <details className="mb-6 rounded-xl border border-amber-200 bg-white p-4">
+          <summary className="cursor-pointer font-semibold">원문 자동 처리 현황</summary>
+          <p className="my-3 text-sm text-slate-600">자동화가 먼저 원문 확보와 중복 확인을 처리합니다. 끝까지 원문을 확보하지 못한 중요 기사만 직접 확인할 수 있습니다.</p>
+          {needsBody.map((item) => <div key={item.id} className="border-t py-3">
+            <p className="text-xs text-slate-500">{item.source} · {item.report_date}</p>
+            <p className="my-1 font-medium">{item.title}</p>
+            {/^https?:\/\//.test(item.url) && <a href={item.url} target="_blank" rel="noopener noreferrer" className="mr-4 text-sm text-blue-700">기사 링크 열기</a>}
+            <button className="rounded border px-3 py-1 text-sm" onClick={() => { setBodyArticle(item); setBodyText(""); setBodyError(""); }}>본문 붙여 넣기</button>
+          </div>)}
+        </details>
+
         <section className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-8">
           {Object.entries(categoryCounts).map(([label, count]) => (
             <div
@@ -346,6 +425,15 @@ export default function Home() {
             {saveNotice}
           </p>
         )}
+        <div className="mb-4 flex gap-2" aria-label="기사 기간 선택">
+          {[['current', '이번 주 기사'], ['archive', '지난 기사']].map(([value, label]) => (
+            <button key={value} aria-pressed={periodView === value} onClick={() => {
+              if (periodView === value) return;
+              setIsLoading(true); setLoadError(null); setArticles([]); setSelectedIds([]); setPeriodView(value);
+            }} className={`rounded-lg px-4 py-2 text-sm ${periodView === value ? 'bg-slate-900 text-white' : 'bg-white border border-slate-300'}`}>{label}</button>
+          ))}
+        </div>
+        <h2 className="mb-3 text-lg font-bold">{periodView === 'current' ? '이번 주 보고서 후보' : '지난 보고서 후보'}</h2>
         <section className="space-y-3" aria-label="기사 목록" aria-busy={isLoading}>
           {isLoading && (
             <p role="status" className="rounded-xl bg-white p-6 text-sm text-slate-600">
@@ -367,7 +455,7 @@ export default function Home() {
           {!isLoading && !loadError && filteredArticles.length === 0 && (
             <p role="status" className="rounded-xl bg-white p-6 text-sm text-slate-600">
               {articles.length === 0
-                ? "선정 기준에 맞는 보고서 후보 기사가 없습니다."
+                ? (periodView === "current" && (dashboardMeta?.summary.pending || 0) > 0 ? `이번 주 ${dashboardMeta?.summary.pending}건이 분석 대기 중입니다. 분석·선정 완료 후 후보가 표시됩니다.` : "해당 기간의 보고서 후보가 없습니다.")
                 : "검색 조건에 맞는 기사가 없습니다. 검색어 또는 분류를 변경해 주세요."}
             </p>
           )}
@@ -451,6 +539,15 @@ export default function Home() {
         </div>
       </div>
 
+      {bodyArticle && <div role="dialog" aria-modal="true" aria-label="기사 본문 입력" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="w-full max-w-3xl rounded-xl bg-white p-6">
+          <h2 className="mb-3 font-bold">{bodyArticle.title}</h2>
+          <label htmlFor="article-body" className="text-sm">원문 본문 (100~100,000자)</label>
+          <textarea id="article-body" rows={12} maxLength={100000} disabled={bodySaving} value={bodyText} onChange={event => setBodyText(event.target.value)} className="mt-2 w-full rounded border p-3" />
+          {bodyError && <p role="alert" className="text-red-700">{bodyError}</p>}
+          <div className="mt-3 flex justify-end gap-3"><button disabled={bodySaving} onClick={() => setBodyArticle(null)}>취소</button><button disabled={bodySaving || bodyText.trim().length < 100} onClick={saveBody} className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-50">{bodySaving ? "저장 중…" : "저장 · 분석 대기로 이동"}</button></div>
+        </div>
+      </div>}
       {originalArticle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
           <div className="max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
@@ -540,3 +637,5 @@ export default function Home() {
     </main>
   );
 }
+
+

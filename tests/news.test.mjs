@@ -27,12 +27,16 @@ function fixture(t) {
   db.exec(`CREATE TABLE articles (
     id INTEGER PRIMARY KEY, category TEXT, source TEXT, title TEXT, ai_title TEXT,
     summary TEXT, original TEXT, published_at TEXT, collected_at TEXT, url TEXT,
-    report_status TEXT, edited_title TEXT, edited_summary TEXT,
+    report_status TEXT, report_reason TEXT, report_date TEXT, week_start TEXT, edited_title TEXT, edited_summary TEXT,
     edit_revision INTEGER NOT NULL DEFAULT 0
   )`);
   db.prepare(`INSERT INTO articles(id,title,ai_title,summary,original,report_status)
     VALUES (?,?,?,?,?,?)`).run(1, "source title", "AI title", "* AI detail", "source body", "included");
   db.prepare("INSERT INTO articles(id,title,report_status) VALUES (2,'excluded','excluded')").run();
+  db.exec("CREATE TABLE source_checks(source_id TEXT,name TEXT,status TEXT,note TEXT,checked_at TEXT,counts TEXT)");
+  const day = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Baghdad",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const start = new Date(`${day}T00:00:00Z`); start.setUTCDate(start.getUTCDate() - (start.getUTCDay()+3)%7);
+  db.prepare("UPDATE articles SET week_start=?").run(start.toISOString().slice(0,10));
   db.close();
   t.after(() => {
     fs.unlinkSync(dbPath);
@@ -59,7 +63,7 @@ const edit = { id: 1, title: "Saved title.", summary: "* 3.14% increase.\n", exp
 test("edits survive a fresh connection and AI regeneration without changing source text", async t => {
   const api = fixture(t);
   assert.equal((await api.PATCH(request(edit))).status, 200);
-  let data = await (await api.GET()).json();
+  let data = await (await api.GET(new Request("http://localhost:3100/api/news"))).json();
   assert.equal(data.articles[0].ai_title, "Saved title");
   assert.equal(data.articles[0].summary, "* 3.14% increase");
   assert.equal(data.articles[0].edit_revision, 1);
@@ -68,7 +72,7 @@ test("edits survive a fresh connection and AI regeneration without changing sour
   assert.equal(db.prepare("SELECT ai_title FROM articles WHERE id=1").get().ai_title, "AI title");
   db.prepare("UPDATE articles SET ai_title='regenerated', summary='regenerated' WHERE id=1").run();
   db.close();
-  data = await (await api.GET()).json();
+  data = await (await api.GET(new Request("http://localhost:3100/api/news"))).json();
   assert.equal(data.articles[0].ai_title, "Saved title");
   assert.equal(data.articles[0].original, "source body");
   assert.equal(data.count, 1);
@@ -80,7 +84,7 @@ test("stale edits cannot overwrite saved text; empty summary is a persistent ove
   assert.equal((await api.PATCH(request({ ...edit, title: "stale" }))).status, 409);
   const result = await api.PATCH(request({ ...edit, summary: "", expectedRevision: 1 }));
   assert.equal(result.status, 200);
-  const data = await (await api.GET()).json();
+  const data = await (await api.GET(new Request("http://localhost:3100/api/news"))).json();
   assert.equal(data.articles[0].summary, "");
   assert.equal(data.articles[0].edit_revision, 2);
 });
@@ -99,7 +103,7 @@ test("invalid, unknown, excluded and cross-origin writes are rejected", async t 
   assert.equal((await api.PATCH(new Request("http://localhost:3100/api/news", {
     method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{",
   }))).status, 400);
-  assert.equal((await (await api.GET()).json()).articles[0].edit_revision, 0);
+  assert.equal((await (await api.GET(new Request("http://localhost:3100/api/news"))).json()).articles[0].edit_revision, 0);
 });
 
 test("a database failure is reported instead of claiming the edit was saved", async t => {
@@ -127,7 +131,7 @@ function editor(fetch) {
     id: 1, category: "NIC", source: "test", date: "", title: "AI title",
     originalTitle: "source", original: "body", summary: ["* detail"], revision: 0,
   };
-  const state = [[article], false];
+  const state = [[], null, "", "", false, "current", [article], null, false];
   let index = 0;
   const exports = {};
   vm.runInNewContext(compiled("app/page.tsx"), {
@@ -182,3 +186,16 @@ test("editor preserves draft text and stays open after a save failure", async ()
   assert.equal(ui.find(saveButton).props.disabled, false);
   assert.equal(ui.find(e => e.props?.role === "alert").props.children, "disk unavailable");
 });
+ test("manual body enters pending once and rejects short input or overwrite", async t => {
+  const api = fixture(t);
+  const db = new Database(api.dbPath);
+  db.prepare("INSERT INTO articles(id,title,report_status,original) VALUES (3,'Reuters article','review','')").run(); db.close();
+  const payload = {action:"provide_body",id:3,expectedRevision:0,body:"x"};
+  assert.equal((await api.PATCH(request(payload))).status,400);
+  payload.body = "Verified article body. ".repeat(10);
+  assert.equal((await api.PATCH(request(payload))).status,200);
+  assert.equal((await api.PATCH(request(payload))).status,409);
+  const check = new Database(api.dbPath);
+  const row=check.prepare("SELECT original,report_status FROM articles WHERE id=3").get(); check.close();
+  assert.equal(row.original,payload.body.trim()); assert.equal(row.report_status,"pending");
+ });

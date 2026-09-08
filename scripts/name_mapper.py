@@ -14,6 +14,11 @@ NAME_MAP = {
     # 이라크
     "Ali Al-Zaidi": "Al-Zaidi 총리",
     "Ali Faleh Al-Zaidi": "Al-Zaidi 총리",
+    "Zaydi 총리": "Al-Zaidi 총리",
+    "Zaidi 총리": "Al-Zaidi 총리",
+    "Halbousi": "Al-Halbousi",
+    "Al Halbousi": "Al-Halbousi",
+    "Al-Halbousi": "Al-Halbousi",
     "Mohammed Shia Al-Sudani": "Al-Sudani 前 총리",
     "Adel Al-Yassiri": "Al-Yassiri NIC 의장",
     "Nouri al-Maliki": "Al-Maliki 前 총리",
@@ -21,6 +26,13 @@ NAME_MAP = {
     "Hadi al-Amiri": "Al-Amiri Badr 대표",
     "Ammar al-Hakim": "Al-Hakim 국가역량연합 대표",
     "Muqtada al-Sadr": "Al-Sadr 종교지도자",
+    "Maliki": "Al-Maliki",
+    "Sudani": "Al-Sudani",
+    "Amiri": "Al-Amiri",
+    "Yassiri": "Al-Yassiri",
+    "Hakim": "Al-Hakim",
+    "Sadr": "Al-Sadr",
+    "Khazali": "Al-Khazali",
 
     # 이란
     "Masoud Pezeshkian": "Pezeshkian 대통령",
