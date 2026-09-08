@@ -47,3 +47,4 @@ __pycache__/
 /data/backups/
 
 !.env.example
+/data/pipeline.lock
