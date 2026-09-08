@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import path from "path";
 import { normalizeReportLine, summaryLines } from "../../report-format";
+import { isAuthenticated } from "../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ function currentReportWeek() {
 }
 
 export async function GET(request: Request) {
+  if (!isAuthenticated(request)) return Response.json({ success: false, error: "로그인이 필요합니다." }, { status: 401 });
   const dbPath = path.join(process.cwd(), "data", "articles.db");
   let db: Database.Database | undefined;
   try {
@@ -48,6 +50,7 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  if (!isAuthenticated(request)) return Response.json({ success: false, error: "로그인이 필요합니다." }, { status: 401 });
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) {
     return Response.json({ success: false, error: "허용되지 않은 요청입니다." }, { status: 403 });

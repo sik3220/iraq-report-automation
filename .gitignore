@@ -45,3 +45,5 @@ __pycache__/
 *.pyc
 # Local article backups
 /data/backups/
+
+!.env.example

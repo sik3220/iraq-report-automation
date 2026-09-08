@@ -18,6 +18,7 @@ function compiled(file) {
 const formatting = {};
 vm.runInNewContext(compiled("app/report-format.ts"), { exports: formatting });
 const routeCode = compiled("app/api/news/route.ts");
+const authStub = { isAuthenticated: () => true };
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "iraq-news-test-"));
@@ -45,7 +46,7 @@ function fixture(t) {
   });
   const exports = {};
   vm.runInNewContext(routeCode, {
-    exports, require: name => name === "../../report-format" ? formatting : loadCommonJs(name),
+    exports, require: name => name === "../../report-format" ? formatting : name === "../../lib/auth" ? authStub : loadCommonJs(name),
     process: { cwd: () => root }, Response, URL,
     console: { error() {} },
   });

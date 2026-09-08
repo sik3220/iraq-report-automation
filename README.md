@@ -45,3 +45,7 @@ python scripts/run_weekly_pipeline.py --week-of 2026-09-08
 
 특정 출처만 시험하려면 `--source ina --source reuters`처럼 반복 지정할 수 있습니다. 수집 단계는 AI를 호출하지 않으며, 중요도 기준을 통과한 기사만 분석 단계로 넘어갑니다.
 
+## 대시보드 인증
+
+배포 환경에서는 `.env.example`을 참고해 `DASHBOARD_PASSWORD`와 `AUTH_SECRET`를 서버 Secret 환경변수로 설정해야 합니다. 인증 설정이 없는 production 환경에서는 기사 API가 차단됩니다.
+

@@ -77,6 +77,10 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -84,6 +88,10 @@ export default function Home() {
     async function loadArticles() {
       try {
         const response = await fetch(`/api/news?period=${periodView}`, { signal: controller.signal });
+        if (response.status === 401) {
+          setAuthRequired(true);
+          return;
+        }
         if (!response.ok) throw new Error("Failed to load articles");
 
         const data = await response.json();
@@ -341,6 +349,32 @@ export default function Home() {
 
     return anchor;
   };
+
+  async function login() {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true); setLoginError("");
+    try {
+      const response = await fetch("/api/auth", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: loginPassword }) });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || "로그인에 실패했습니다.");
+      setLoginPassword(""); setAuthRequired(false); retryLoad();
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "로그인에 실패했습니다.");
+    } finally { setIsLoggingIn(false); }
+  }
+
+  if (authRequired) return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6">
+      <form className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-sm" onSubmit={(event) => { event.preventDefault(); void login(); }}>
+        <h1 className="text-xl font-bold text-slate-900">주간정보보고 자동화</h1>
+        <p className="mt-2 text-sm text-slate-600">대시보드 비밀번호를 입력해 주세요.</p>
+        <label className="mt-5 block text-sm font-semibold" htmlFor="dashboard-password">비밀번호</label>
+        <input id="dashboard-password" type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2" autoFocus />
+        {loginError && <p className="mt-2 text-sm text-red-700" role="alert">{loginError}</p>}
+        <button type="submit" disabled={isLoggingIn || !loginPassword} className="mt-4 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isLoggingIn ? "확인 중..." : "로그인"}</button>
+      </form>
+    </main>
+  );
 
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
