@@ -25,7 +25,7 @@ export function authenticationEnabled() {
 
 export function isAuthenticated(request: Request) {
   if (!authenticationEnabled()) {
-    return environment().NODE_ENV !== "production";
+    return environment().IRAQ_LOCAL_ONLY === "1" || environment().NODE_ENV !== "production";
   }
   const cookie = request.headers.get("cookie") || "";
   const match = cookie.match(new RegExp(`(?:^|;\\s*)${SESSION_COOKIE}=([^;]+)`));
@@ -56,4 +56,5 @@ export function sessionCookie(secure: boolean) {
 export function expiredSessionCookie(secure: boolean) {
   return `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure ? "; Secure" : ""}`;
 }
+
 
