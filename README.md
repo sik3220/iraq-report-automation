@@ -49,3 +49,17 @@ python scripts/run_weekly_pipeline.py --week-of 2026-09-08
 
 배포 환경에서는 `.env.example`을 참고해 `DASHBOARD_PASSWORD`와 `AUTH_SECRET`를 서버 Secret 환경변수로 설정해야 합니다. 인증 설정이 없는 production 환경에서는 기사 API가 차단됩니다.
 
+## Docker 배포
+
+영속 디스크를 사용할 수 있는 서버에서 `.env`를 준비한 뒤 다음 명령으로 실행합니다.
+
+```bash
+docker compose up -d --build
+```
+
+`./data`가 컨테이너의 `/app/data`에 연결되므로 SQLite 기사 DB가 컨테이너 재생성 후에도 유지됩니다. 주간 수집은 별도 예약 작업에서 다음 명령을 실행합니다.
+
+```bash
+docker compose run --rm dashboard python scripts/run_weekly_pipeline.py
+```
+
