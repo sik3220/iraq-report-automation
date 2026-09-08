@@ -34,3 +34,14 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## 주간 수집 파이프라인
+
+보고 기간은 목요일부터 수요일까지 계산됩니다. 다음 명령을 실행하면 출처 수집, 중복 제거, 본문 재확보, 중요도 기반 AI 분류를 지정한 주간 범위 안에서 순서대로 처리합니다.
+
+```bash
+python scripts/run_weekly_pipeline.py --week-of 2026-09-08
+```
+
+특정 출처만 시험하려면 `--source ina --source reuters`처럼 반복 지정할 수 있습니다. 수집 단계는 AI를 호출하지 않으며, 중요도 기준을 통과한 기사만 분석 단계로 넘어갑니다.
+

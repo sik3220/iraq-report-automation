@@ -246,18 +246,27 @@ export default function Home() {
       return;
     }
 
+    const reportPeriod = dashboardMeta?.reportPeriod;
     const children: Paragraph[] = [
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { after: 360 },
+        spacing: { after: 120 },
         children: [
           new TextRun({
-            text: "주간정보보고",
+            text: "이라크 주간정보보고",
             bold: true,
             size: 32,
           }),
         ],
       }),
+      ...(reportPeriod ? [new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 360 },
+        children: [new TextRun({
+          text: `${reportPeriod.start} ~ ${reportPeriod.end}`,
+          size: 20,
+        })],
+      })] : []),
     ];
 
     selectedArticles.forEach((article) => {

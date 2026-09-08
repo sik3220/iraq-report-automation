@@ -51,7 +51,7 @@ def priority_score(article: sqlite3.Row) -> int:
     return sum(weight for term, weight in PRIORITY_TERMS.items() if term in text)
 
 
-def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT) -> int:
+def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT, week_of: str | None = None) -> int:
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     try:
@@ -63,10 +63,20 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT)
             connection.backup(backup)
         print(f"백업: {backup_path}", flush=True)
         ensure_schema(connection)
-        where = "" if reprocess else "WHERE report_status = 'pending'"
+        conditions = []
+        parameters: list[str] = []
+        if not reprocess:
+            conditions.append("report_status = 'pending'")
+        if week_of:
+            from report_dates import report_week
+            week_start, _ = report_week(week_of)
+            conditions.append("week_start = ?")
+            parameters.append(week_start)
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         articles = connection.execute(
             f"SELECT id, title, source, original, collected_at FROM articles {where} "
-            "ORDER BY collected_at DESC"
+            "ORDER BY collected_at DESC",
+            parameters,
         ).fetchall()
         ranked = sorted(
             articles,
@@ -114,7 +124,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="기사 선정 및 현식식 보고서 문안 생성")
     parser.add_argument("--reprocess", action="store_true", help="기존 기사도 새 기준으로 재처리")
     parser.add_argument("--limit", type=int, default=DEFAULT_LIMIT, help="선택적 수동 상한; 생략하면 중요도 기준 통과 기사를 모두 처리")
+    parser.add_argument("--week-of", help="해당 날짜가 포함된 목~수 보고 기간만 처리 YYYY-MM-DD")
     args = parser.parse_args()
     if args.limit is not None and args.limit < 1:
         parser.error("--limit은 1 이상이어야 합니다")
-    raise SystemExit(1 if process_articles(args.reprocess, args.limit) else 0)
+    raise SystemExit(1 if process_articles(args.reprocess, args.limit, args.week_of) else 0)
