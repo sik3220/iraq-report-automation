@@ -355,7 +355,7 @@ export default function Home() {
         {dashboardMeta && (
           <section className="mb-6 space-y-4">
             <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4"><p className="text-xs font-semibold text-blue-700">현재 보고 기간</p><p className="mt-1 text-lg font-bold text-blue-950">{dashboardMeta.reportPeriod.start} ~ {dashboardMeta.reportPeriod.end}</p><p className="mt-1 text-xs text-blue-800">목요일~수요일 · 바그다드 시간 기준</p></div>
-            <div className="grid gap-3 md:grid-cols-4">{[["보고서 후보", dashboardMeta.summary.included || 0], ["분석 대기", dashboardMeta.summary.pending || 0], ["자동 처리 대기", dashboardMeta.summary.review || 0], ["제외·중복", (dashboardMeta.summary.excluded || 0) + (dashboardMeta.summary.duplicate || 0)]].map(([label, count]) => <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold">{count}</p></div>)}</div>
+            <div className="grid gap-3 md:grid-cols-4">{[["보고서 후보", dashboardMeta.summary.included || 0], ["분석 대기", dashboardMeta.summary.pending || 0], ["본문·출처 확인 대기", dashboardMeta.summary.review || 0], ["제외·중복", (dashboardMeta.summary.excluded || 0) + (dashboardMeta.summary.duplicate || 0)]].map(([label, count]) => <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold">{count}</p></div>)}</div>
             {dashboardMeta.testDataCount > 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">확인된 시험 기사 {dashboardMeta.testDataCount}건(test.com)은 제외 상태입니다. 실제 출처에서 시험 수집한 기사와는 구분됩니다.</p>}
             <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
               <summary className="cursor-pointer text-sm font-semibold">출처 수집 상태 · {dashboardMeta.sources.length}개</summary>
@@ -384,7 +384,7 @@ export default function Home() {
 
         <details className="mb-6 rounded-xl border border-amber-200 bg-white p-4">
           <summary className="cursor-pointer font-semibold">원문 자동 처리 현황</summary>
-          <p className="my-3 text-sm text-slate-600">자동화가 먼저 원문 확보와 중복 확인을 처리합니다. 끝까지 원문을 확보하지 못한 중요 기사만 직접 확인할 수 있습니다.</p>
+          <p className="my-3 text-sm text-slate-600">제목만 확보된 출처나 자동 본문 확보에 실패한 기사가 포함된 수입니다. 원문이 확보된 기사는 분석 대기로 이동하고, 끝까지 확보하지 못한 중요 기사만 직접 확인할 수 있습니다.</p>
           {needsBody.map((item) => <div key={item.id} className="border-t py-3">
             <p className="text-xs text-slate-500">{item.source} · {item.report_date}</p>
             <p className="my-1 font-medium">{item.title}</p>
