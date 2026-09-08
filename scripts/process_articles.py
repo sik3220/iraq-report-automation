@@ -4,6 +4,7 @@ import sqlite3
 from datetime import datetime
 
 from ai_processor import analyze_article
+from category_mapper import classify_category
 from init_db import DB_PATH, ensure_schema
 
 DEFAULT_LIMIT = None
@@ -74,7 +75,7 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT,
             parameters.append(week_start)
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         articles = connection.execute(
-            f"SELECT id, title, source, original, collected_at FROM articles {where} "
+            f"SELECT id,title,source,original,collected_at,category,region,excerpt FROM articles {where} "
             "ORDER BY collected_at DESC",
             parameters,
         ).fetchall()
@@ -102,9 +103,15 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT,
                 continue
             try:
                 report = analyze_article(article["title"] or "", article["original"] or "")
+                category = classify_category(
+                    title=article["title"] or "", ai_title=report.title,
+                    summary=report.summary, original=article["original"] or "",
+                    excerpt=article["excerpt"] or "", region=article["region"] or "",
+                    current_category=article["category"] or "미분류",
+                )
                 connection.execute(
-                    "UPDATE articles SET ai_title=?, summary=?, report_status=?, report_reason=? WHERE id=?",
-                    (report.title, report.summary, report.status, report.reason, article["id"]),
+                    "UPDATE articles SET ai_title=?,summary=?,report_status=?,report_reason=?,category=? WHERE id=?",
+                    (report.title, report.summary, report.status, report.reason, category, article["id"]),
                 )
                 connection.commit()
                 counts[report.status] += 1

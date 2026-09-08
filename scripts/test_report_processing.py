@@ -11,10 +11,19 @@ from init_db import ensure_schema
 from name_mapper import replace_names
 from report_style import normalize_summary
 from dedupe_review_articles import same_event
+from category_mapper import classify_category
 import process_articles as batch
 
 
 class ReportTests(unittest.TestCase):
+    def test_category_mapper_classifies_iraq_articles_and_preserves_editorial_values(self):
+        self.assertEqual(classify_category(ai_title="이라크 투자청, 100만 주택용지 가격 인하", region="이라크"), "주택")
+        self.assertEqual(classify_category(ai_title="이라크 PMF, 니네와서 ISIS 조직원 체포", region="이라크"), "안보")
+        self.assertEqual(classify_category(ai_title="이라크 석유부, 원유 수출 확대 발표", region="이라크"), "경제")
+        self.assertEqual(classify_category(ai_title="Al-Halbousi 국회의장, 튀르키예 공식 방문", region="이라크"), "정치")
+        self.assertEqual(classify_category(ai_title="이란, 호르무즈 관련 경고", region="세계"), "세계")
+        self.assertEqual(classify_category(ai_title="석유 투자", region="이라크", current_category="NIC"), "NIC")
+
     def test_names_single_pass_and_idempotent(self):
         text = "Donald Trump, Trump 대통령, 트럼프"
         expected = "Trump 대통령, Trump 대통령, Trump 대통령"
