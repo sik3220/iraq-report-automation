@@ -68,6 +68,9 @@ class ReportTests(unittest.TestCase):
         self.assertFalse(same_event(
             "Israeli strikes southern Lebanon", "Israel releases Lebanese prisoners after talks",
         ))
+        self.assertTrue(same_event(
+            "미국 이란 유조선 5척 공격 발표", "미국 이란 유조선 5척 파괴 영상 공개",
+        ))
 
     def test_country_names_and_missing_body(self):
         self.assertEqual(replace_names("Iran, Oman 협의"), "이란, 오만 협의")

@@ -1,6 +1,7 @@
 """Collapse high-confidence duplicate events before asking for source text."""
 import re
 import sqlite3
+from contextlib import closing
 from itertools import combinations
 
 from init_db import DB_PATH, ensure_schema
@@ -13,7 +14,7 @@ STOP_WORDS = {
 
 
 def title_tokens(title: str) -> set[str]:
-    return {word for word in re.findall(r"[a-z]{3,}", title.lower()) if word not in STOP_WORDS}
+    return {word for word in re.findall(r"[^\W_]{2,}", title.lower()) if word not in STOP_WORDS and not word.isdigit()}
 
 
 def same_event(left: str, right: str) -> bool:
@@ -27,12 +28,12 @@ def same_event(left: str, right: str) -> bool:
 
 def dedupe_review_articles(week_of: str | None = None) -> dict:
     week_start, _ = report_week(week_of or today())
-    with sqlite3.connect(DB_PATH) as connection:
+    with closing(sqlite3.connect(DB_PATH)) as connection, connection:
         ensure_schema(connection)
         connection.row_factory = sqlite3.Row
         articles = connection.execute(
-            "SELECT id,title,report_status,original,excerpt,collected_at FROM articles "
-            "WHERE week_start=? AND report_status IN ('included','review')",
+            "SELECT id,COALESCE(ai_title,title) AS dedupe_title,report_status,original,excerpt,collected_at FROM articles "
+            "WHERE week_start=? AND report_status IN ('pending','included','review')",
             (week_start,),
         ).fetchall()
         parent = {article["id"]: article["id"] for article in articles}
@@ -49,7 +50,7 @@ def dedupe_review_articles(week_of: str | None = None) -> dict:
                 parent[right_root] = left_root
 
         for left, right in combinations(articles, 2):
-            if same_event(left["title"] or "", right["title"] or ""):
+            if same_event(left["dedupe_title"] or "", right["dedupe_title"] or ""):
                 union(left["id"], right["id"])
 
         clusters: dict[int, list[sqlite3.Row]] = {}
@@ -69,7 +70,7 @@ def dedupe_review_articles(week_of: str | None = None) -> dict:
                 ),
             )
             for article in cluster:
-                if article["id"] == representative["id"] or article["report_status"] != "review":
+                if article["id"] == representative["id"]:
                     continue
                 connection.execute(
                     "UPDATE articles SET report_status='duplicate',duplicate_of=?,report_reason=? WHERE id=?",
