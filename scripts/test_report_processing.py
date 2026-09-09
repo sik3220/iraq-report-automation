@@ -24,6 +24,28 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(classify_category(ai_title="이란, 호르무즈 관련 경고", region="세계"), "세계")
         self.assertEqual(classify_category(ai_title="석유 투자", region="이라크", current_category="NIC"), "NIC")
 
+    def test_low_priority_filter_reduces_pending_and_review_without_ai(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "articles.db"
+            with closing(sqlite3.connect(path)) as db, db:
+                ensure_schema(db)
+                db.executemany(
+                    "INSERT INTO articles(title,source,report_status,week_start,date_basis) VALUES (?,?,?,?,?)",
+                    [
+                        ("Iraq oil export plan", "INA", "pending", "2026-09-03", "published"),
+                        ("Local ceremony", "INA", "pending", "2026-09-03", "published"),
+                        ("العراق يناقش النفط والطاقة", "Shafaq", "review", "2026-09-03", "published"),
+                        ("Community event", "Shafaq", "review", "2026-09-03", "published"),
+                    ],
+                )
+            with patch.object(batch, "DB_PATH", path):
+                self.assertEqual(batch.filter_low_priority("2026-09-08"), 2)
+            with closing(sqlite3.connect(path)) as db:
+                self.assertEqual(
+                    db.execute("SELECT report_status,COUNT(*) FROM articles GROUP BY report_status ORDER BY report_status").fetchall(),
+                    [("excluded", 2), ("pending", 1), ("review", 1)],
+                )
+
     def test_names_single_pass_and_idempotent(self):
         text = "Donald Trump, Trump 대통령, 트럼프"
         expected = "Trump 대통령, Trump 대통령, Trump 대통령"

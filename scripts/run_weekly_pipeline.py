@@ -3,7 +3,7 @@ import argparse
 import json
 
 from dedupe_review_articles import dedupe_review_articles
-from process_articles import process_articles
+from process_articles import filter_low_priority, process_articles
 from report_dates import today
 from resolve_review_articles import resolve_review_articles
 from rss_to_db import save_rss_articles
@@ -16,12 +16,14 @@ def run_pipeline(
 ) -> dict:
     week_of = week_of or today()
     collected = save_rss_articles(week_of, sources)
+    filtered = filter_low_priority(week_of)
     deduped = dedupe_review_articles(week_of)
     resolved = resolve_review_articles(week_of)
     failures = process_articles(week_of=week_of) if run_ai else None
     return {
         "week_of": week_of,
         "collection": collected,
+        "initial_filter": {"excluded": filtered},
         "dedupe": deduped,
         "body_resolution": resolved,
         "ai": {"executed": run_ai, "failures": failures},

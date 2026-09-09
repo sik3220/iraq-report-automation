@@ -8,7 +8,7 @@ from category_mapper import classify_category
 from init_db import DB_PATH, ensure_schema
 
 DEFAULT_LIMIT = None
-MIN_PRIORITY_SCORE = 3
+MIN_PRIORITY_SCORE = 11
 PRIORITY_TERMS = {
     "이라크": 8, "iraq": 8, "العراق": 8,
     "안보": 6, "security": 6, "امن": 6,
@@ -52,7 +52,33 @@ def priority_score(article: sqlite3.Row) -> int:
     return sum(weight for term, weight in PRIORITY_TERMS.items() if term in text)
 
 
+def filter_low_priority(week_of: str | None = None) -> int:
+    conditions = ["report_status IN ('pending','review')"]
+    parameters: list[str] = []
+    if week_of:
+        from report_dates import report_week
+        week_start, _ = report_week(week_of)
+        conditions.append("week_start = ?")
+        parameters.append(week_start)
+    with closing(sqlite3.connect(DB_PATH)) as connection, connection:
+        connection.row_factory = sqlite3.Row
+        ensure_schema(connection)
+        articles = connection.execute(
+            f"SELECT id,title,source FROM articles WHERE {' AND '.join(conditions)}",
+            parameters,
+        ).fetchall()
+        ids = [(article["id"],) for article in articles if priority_score(article) < MIN_PRIORITY_SCORE]
+        connection.executemany(
+            "UPDATE articles SET report_status='excluded',report_reason='사전 분류: 중요도 기준 미달' WHERE id=?",
+            ids,
+        )
+        connection.commit()
+    return len(ids)
+
+
 def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT, week_of: str | None = None) -> int:
+    if not reprocess:
+        filter_low_priority(week_of)
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     try:
