@@ -22,7 +22,7 @@ def normalized_text(text: str) -> str:
     text = unicodedata.normalize("NFKC", text).lower()
     text = "".join(str(unicodedata.decimal(c)) if c.isdecimal() else c for c in text)
     text = re.sub(r"[ـً-ٰٟ]", "", text)
-    return " ".join(re.findall(r"[w]+(?:[.,][0-9]+)?", text, flags=re.UNICODE))
+    return " ".join(re.findall(r"[^\W_]+(?:[.,][0-9]+)?", text, flags=re.UNICODE))
 
 
 def title_hash(title: str) -> str | None:

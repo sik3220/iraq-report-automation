@@ -67,17 +67,18 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(batch.pre_ai_exclusion_reason("السفارة تتابع الاعتداء على الطلبة"), "개별 유학생 피습·영사 대응")
         self.assertIsNone(batch.pre_ai_exclusion_reason("العراق يوسع الاستثمار في الطاقة"))
 
-    def test_duplicate_event_requires_four_meaningful_shared_words(self):
-        self.assertTrue(same_event(
-            "US military strikes three Iranian crude oil carriers",
-            "U.S. strikes three Iranian shadow network oil tankers",
-        ))
-        self.assertFalse(same_event(
-            "Israeli strikes southern Lebanon", "Israel releases Lebanese prisoners after talks",
-        ))
-        self.assertTrue(same_event(
-            "미국 이란 유조선 5척 공격 발표", "미국 이란 유조선 5척 파괴 영상 공개",
-        ))
+    def test_duplicate_match_preserves_changed_numbers_and_negation(self):
+        self.assertTrue(same_event("Iraq announces new housing investment programme", "Iraq announces new housing investment programme"))
+        self.assertFalse(same_event("US destroys three Iranian oil carriers", "US destroys five Iranian oil carriers"))
+        self.assertFalse(same_event("Iraq approves new housing programme", "Iraq does not approve new housing programme"))
+        self.assertFalse(same_event("미국 이란 유조선 3척 공격 발표", "미국 이란 유조선 5척 공격 발표"))
+
+    def test_priority_preserves_iraq_topics_without_country_name(self):
+        for title in ("مجلس النواب يناقش قانون الانتخابات", "هيئة الاستثمار تعلن المدن الجديدة",
+                      "الحلبوسي يترأس مباحثات برلمانية", "القوات الأمنية تحمي الحدود"):
+            self.assertTrue(batch.eligible({"title": title, "source": "INA"}), title)
+        self.assertTrue(batch.eligible({"title": "US and Iran trade attacks on ships", "source": "BBC"}))
+        self.assertFalse(batch.eligible({"title": "Egypt drugs case", "source": "BBC"}))
 
     def test_country_names_and_missing_body(self):
         self.assertEqual(replace_names("Iran, Oman 협의"), "이란, 오만 협의")

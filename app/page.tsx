@@ -22,7 +22,7 @@ type Article = {
   original: string;
 };
 
-type DashboardMeta = { reportPeriod: { start: string; end: string }; summary: Record<string, number>; testDataCount: number; sources: Array<{ source_id: string; name: string; status: string; note: string | null; checked_at: string | null; counts: Record<string, number> }> };
+type DashboardMeta = { analysisBudget?: {usedUsd:number; monthlyUsd:number; blocked:boolean; time:string} | null; reportPeriod: { start: string; end: string }; summary: Record<string, number>; testDataCount: number; sources: Array<{ source_id: string; name: string; status: string; note: string | null; checked_at: string | null; counts: Record<string, number> }> };
 type ApiArticle = {
   id: number;
   category: Article["category"];
@@ -390,6 +390,10 @@ export default function Home() {
           <section className="mb-6 space-y-4">
             <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4"><p className="text-xs font-semibold text-blue-700">현재 보고 기간</p><p className="mt-1 text-lg font-bold text-blue-950">{dashboardMeta.reportPeriod.start} ~ {dashboardMeta.reportPeriod.end}</p><p className="mt-1 text-xs text-blue-800">목요일~수요일 · 바그다드 시간 기준</p></div>
             <div className="grid gap-3 md:grid-cols-4">{[["보고서 후보", dashboardMeta.summary.included || 0], ["분석 대기", dashboardMeta.summary.pending || 0], ["본문·출처 확인 대기", dashboardMeta.summary.review || 0], ["제외·중복", (dashboardMeta.summary.excluded || 0) + (dashboardMeta.summary.duplicate || 0)]].map(([label, count]) => <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold">{count}</p></div>)}</div>
+            {dashboardMeta.analysisBudget && <p className="text-sm text-slate-600">
+              매일 {dashboardMeta.analysisBudget.time} 자동 분석(바그다드) · 이번 달 예상 비용 {"$"}{dashboardMeta.analysisBudget.usedUsd.toFixed(2)} / {"$"}{dashboardMeta.analysisBudget.monthlyUsd.toFixed(2)}
+              {dashboardMeta.analysisBudget.blocked && " · 예산 잔액 부족: 남은 기사는 분석 대기"}
+            </p>}
             {dashboardMeta.testDataCount > 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">확인된 시험 기사 {dashboardMeta.testDataCount}건(test.com)은 제외 상태입니다. 실제 출처에서 시험 수집한 기사와는 구분됩니다.</p>}
             <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
               <summary className="cursor-pointer text-sm font-semibold">출처 수집 상태 · {dashboardMeta.sources.length}개</summary>

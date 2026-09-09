@@ -4,8 +4,13 @@ import sqlite3
 from datetime import datetime
 
 from ai_processor import analyze_article
+from ai_budget import BudgetExceeded
+from report_dates import today
+from dedupe_review_articles import dedupe_review_articles
 from category_mapper import classify_category
 from init_db import DB_PATH, ensure_schema
+from news_dedup import normalized_text
+from news_sources import NEWS_SOURCES
 
 DEFAULT_LIMIT = None
 MIN_PRIORITY_SCORE = 11
@@ -47,9 +52,43 @@ def pre_ai_exclusion_reason(title: str) -> str | None:
     return None
 
 
-def priority_score(article: sqlite3.Row) -> int:
-    text = f"{article['title'] or ''} {article['source'] or ''}".lower()
-    return sum(weight for term, weight in PRIORITY_TERMS.items() if term in text)
+# These are recall guards, not a final editorial decision.
+IRAQ_SOURCES = {s["name"] for s in NEWS_SOURCES if s["region"] == "이라크"}
+CORE_TOPICS = (
+    "parliament", "housing", "residential", "investment", "cabinet", "election",
+    "budget", "refinery", "electricity", "militia", "disarm", "prime minister",
+    "국회", "주택", "투자", "예산", "전력", "무장", "برلمان", "مجلس النواب",
+    "الحلبوسي", "السوداني", "مجلس الوزراء", "انتخابات", "موازنة", "استثمار",
+    "سكن", "مدن جديدة", "المدن الجديدة", "مصفاة", "كهرباء", "الفصائل", "الأمن",
+    "منطقة حرة", "مطار دولي", "هيئة الاستثمار", "رئيس الوزراء",
+)
+REGIONAL_TOPICS = (
+    "hormuz", "red sea", "opec", "هرمز", "البحر الأحمر", "أوبك",
+    "호르무즈", "홍해", "iran", "إيران", "이란", "gulf", "الخليج",
+)
+REGIONAL_EVENTS = (
+    "attack", "strike", "sanction", "blockade", "ceasefire", "negotiat", "missile",
+    "oil", "shipping", "war", "هجوم", "قصف", "عقوبات", "حصار", "مفاوض",
+    "صاروخ", "نفط", "حرب", "공격", "제재", "협상", "원유", "휴전",
+)
+
+
+def priority_score(article) -> int:
+    title = normalized_text(article["title"] or "")
+    score = sum(weight for term, weight in PRIORITY_TERMS.items()
+                if normalized_text(term) in title)
+    iraq = article["source"] in IRAQ_SOURCES or any(
+        term in title for term in ("iraq", "العراق", "이라크"))
+    if iraq and any(normalized_text(term) in title for term in CORE_TOPICS):
+        score = max(score, MIN_PRIORITY_SCORE)
+    if any(normalized_text(term) in title for term in REGIONAL_TOPICS) and any(
+            normalized_text(term) in title for term in REGIONAL_EVENTS):
+        score = max(score, MIN_PRIORITY_SCORE)
+    return score
+
+
+def eligible(article) -> bool:
+    return not pre_ai_exclusion_reason(article["title"] or "") and priority_score(article) >= MIN_PRIORITY_SCORE
 
 
 def filter_low_priority(week_of: str | None = None) -> int:
@@ -67,7 +106,7 @@ def filter_low_priority(week_of: str | None = None) -> int:
             f"SELECT id,title,source FROM articles WHERE {' AND '.join(conditions)}",
             parameters,
         ).fetchall()
-        ids = [(article["id"],) for article in articles if priority_score(article) < MIN_PRIORITY_SCORE]
+        ids = [(article["id"],) for article in articles if not eligible(article)]
         connection.executemany(
             "UPDATE articles SET report_status='excluded',report_reason='사전 분류: 중요도 기준 미달' WHERE id=?",
             ids,
@@ -79,6 +118,7 @@ def filter_low_priority(week_of: str | None = None) -> int:
 def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT, week_of: str | None = None) -> int:
     if not reprocess:
         filter_low_priority(week_of)
+        dedupe_review_articles(week_of)
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     try:
@@ -111,7 +151,7 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT,
             reverse=True,
         )
         if not reprocess:
-            ranked = [article for article in ranked if priority_score(article) >= MIN_PRIORITY_SCORE]
+            ranked = [article for article in ranked if eligible(article)]
         articles = ranked[:limit] if limit is not None else ranked
         failures = 0
         counts = {"included": 0, "excluded": 0, "review": 0}
@@ -127,6 +167,18 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT,
                 counts["excluded"] += 1
                 print(f"excluded: {exclusion}", flush=True)
                 continue
+            connection.execute("BEGIN IMMEDIATE")
+            attempted = connection.execute(
+                "SELECT 1 FROM analysis_attempts WHERE article_id=? AND day=?",
+                (article["id"],today())).fetchone()
+            current = connection.execute("SELECT report_status FROM articles WHERE id=?", (article["id"],)).fetchone()
+            if attempted or (not reprocess and current[0] != "pending"):
+                connection.rollback()
+                continue
+            attempt = connection.execute(
+                "INSERT INTO analysis_attempts(article_id,day,status) VALUES (?,?,'started')",
+                (article["id"],today())).lastrowid
+            connection.commit()
             try:
                 report = analyze_article(article["title"] or "", article["original"] or "")
                 category = classify_category(
@@ -139,11 +191,20 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT,
                     "UPDATE articles SET ai_title=?,summary=?,report_status=?,report_reason=?,category=? WHERE id=?",
                     (report.title, report.summary, report.status, report.reason, category, article["id"]),
                 )
+                connection.execute("UPDATE analysis_attempts SET status='complete' WHERE id=?", (attempt,))
                 connection.commit()
                 counts[report.status] += 1
                 print(f"{report.status}: {report.title}\n{report.summary}\n근거: {report.reason}", flush=True)
+            except BudgetExceeded:
+                connection.rollback()
+                connection.execute("DELETE FROM analysis_attempts WHERE id=?", (attempt,))
+                connection.commit()
+                print("예산 대기: 남은 기사는 삭제하지 않고 다음 실행에 처리", flush=True)
+                break
             except Exception as error:
                 connection.rollback()
+                connection.execute("UPDATE analysis_attempts SET status='failed' WHERE id=?", (attempt,))
+                connection.commit()
                 failures += 1
                 # No overwrite on failure; keep the previous report and status.
                 print(f"처리 실패(기사 {article['id']}): {type(error).__name__}", flush=True)

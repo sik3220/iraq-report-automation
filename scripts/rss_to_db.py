@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 
 from init_db import DB_PATH, ensure_schema
 from news_sources import NEWS_SOURCES
-from news_dedup import canonical_url, title_hash, duplicate_title
+from news_dedup import canonical_url, title_hash
 from report_dates import BAGHDAD, article_date, report_week, today
 from article_scraper import fetch_article_text
 
@@ -108,7 +108,7 @@ def store_entry(connection, source, entry, collected, start, end):
     if not day or day < start or day > end or day > article_date(collected, collected)[0]:
         return "outside_period"
     fingerprint = title_hash(title)
-    duplicate = duplicate_title(connection, fingerprint, day) if basis == "published" else None
+    duplicate = None  # Compare fetched content before classifying a same-title follow-up.
     tags = " ".join(str(tag.get("term", "")) for tag in entry.get("tags", []))
     sections = (url + " " + tags).lower()
     is_low_priority = any(word in sections for word in SKIP_SECTIONS)

@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from name_mapper import replace_names
+from ai_budget import reserve, settle, MAX_OUTPUT
 from report_style import REPORT_INSTRUCTIONS, normalize_summary, strip_terminal_period
 
 MAX_ARTICLE_LENGTH = 12000
@@ -54,15 +55,20 @@ def analyze_article(title: str, article_text: str) -> ReportArticle:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY가 없습니다")
-    client = OpenAI(api_key=api_key, timeout=90.0, max_retries=1)
+    payload = json.dumps(
+        {"source_title": title[:1000], "body": cleaned[:MAX_ARTICLE_LENGTH],
+         "body_available": bool(cleaned)}, ensure_ascii=False)
+    client = OpenAI(api_key=api_key, base_url="https://api.openai.com/v1",
+                    timeout=90.0, max_retries=0)
+    reservation = reserve(REPORT_INSTRUCTIONS, payload)
     response = client.responses.create(
-        model="gpt-5.5",
-        instructions=REPORT_INSTRUCTIONS,
-        input=json.dumps(
-            {"source_title": title, "body": cleaned[:MAX_ARTICLE_LENGTH],
-             "body_available": bool(cleaned)}, ensure_ascii=False
-        ),
+        model="gpt-5.5", instructions=REPORT_INSTRUCTIONS, input=payload,
+        max_output_tokens=MAX_OUTPUT, reasoning={"effort": "low"}, service_tier="default",
     )
+    settle(reservation, response.usage)
+    if response.status != "completed":
+        raise ValueError("분석 출력 미완료 — 다음 날 재시도")
+
     return parse_report(response.output_text.strip(), has_body=bool(cleaned))
 
 

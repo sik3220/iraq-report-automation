@@ -1,5 +1,6 @@
 import Database from "better-sqlite3";
 import path from "path";
+import fs from "node:fs";
 import { normalizeReportLine, summaryLines } from "../../report-format";
 import { isAuthenticated } from "../../lib/auth";
 
@@ -37,7 +38,17 @@ export async function GET(request: Request) {
     summaryRows.forEach((row) => { summary[row.status] = row.count; });
     const testData = db.prepare("SELECT COUNT(*) AS count FROM articles WHERE url = 'https://test.com' AND report_status = 'excluded'").get() as { count: number };
     const sources = db.prepare<[], { source_id: string; name: string; status: string; note: string | null; checked_at: string | null; counts: string | null }>("SELECT source_id, name, status, note, checked_at, counts FROM source_checks ORDER BY name").all().map((row: { source_id: string; name: string; status: string; note: string | null; checked_at: string | null; counts: string | null }) => ({ ...row, counts: row.counts ? JSON.parse(row.counts) : {} }));
-    return Response.json({ success: true, count: articles.length, articles, needsBody, meta: { reportPeriod: period, summary, testDataCount: testData.count, sources } });
+    let analysisBudget = null;
+    const configPath = path.join(process.cwd(), "deploy", "analysis-settings.json");
+    if (fs.existsSync(configPath) && db.prepare("SELECT 1 FROM sqlite_master WHERE name='ai_spend'").get()) {
+      const settings = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      const day = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Baghdad",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+      const usage = db.prepare("SELECT COALESCE(SUM(COALESCE(charged,reserved)),0) AS total FROM ai_spend WHERE substr(day,1,7)=?").get(day.slice(0,7)) as {total:number};
+      const state = db.prepare("SELECT blocked FROM ai_budget_state WHERE day=?").get(day) as {blocked:number} | undefined;
+      analysisBudget = { usedUsd: usage.total / 1000000, monthlyUsd: settings.monthly_usd,
+        blocked: Boolean(state?.blocked), time: settings.time_baghdad };
+    }
+    return Response.json({ success: true, count: articles.length, articles, needsBody, meta: { reportPeriod: period, summary, testDataCount: testData.count, sources, analysisBudget } });
   } catch (error) {
     console.error("Failed to load articles:", error);
     return Response.json(
