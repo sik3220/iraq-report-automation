@@ -23,7 +23,7 @@ NEWS_SOURCES = [
     dict(id="baghdadtoday", name="Baghdad Today", type="rss", language="ar", region="이라크", category="미분류",
          url="https://baghdadtoday.news/rss.xml", enabled=True),
     dict(id="alsumaria", name="Alsumaria", type="rss", language="ar", region="이라크", category="미분류",
-         url="https://www.alsumaria.tv/Rss/iraq-latest-news/ar", enabled=True),
+         url="https://www.alsumaria.tv/Rss/iraq-latest-news/ar", enabled=True, body_fetch_review=True),
     dict(id="almada", name="Almada", type="listing", language="ar", region="이라크", category="미분류",
          url="https://almadapaper.net/", article_pattern=r"/[0-9]{4,}/?$", enabled=True,
          note="공개 목록의 제목·링크만 수집, 본문 AI 사용은 별도 확인"),

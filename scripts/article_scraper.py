@@ -78,7 +78,6 @@ def fetch_article_text(url: str) -> str:
             "header",
             "footer",
             "aside",
-            "form",
         ]
     ):
         element.decompose()
@@ -98,7 +97,7 @@ def fetch_article_text(url: str) -> str:
     # `.box.story.fullstory` 컨테이너 안에 텍스트 블록을 직접 둔다.
     # 해당 컨테이너가 있고 기존 추출 결과가 짧을 때만 보조 경로로 사용한다.
     if len("\n\n".join(paragraphs)) < MIN_ARTICLE_LENGTH:
-        story = soup.select_one(".box.story.fullstory")
+        story = soup.select_one('.box.story.fullstory, [itemprop="articleBody"]')
         if story:
             used_story_fallback = True
             for line in story.get_text("\n", strip=True).splitlines():

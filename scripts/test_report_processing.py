@@ -12,10 +12,17 @@ from name_mapper import replace_names
 from report_style import normalize_summary
 from dedupe_review_articles import same_event
 from category_mapper import classify_category
+from article_scraper import fetch_article_text
 import process_articles as batch
 
 
 class ReportTests(unittest.TestCase):
+    def test_article_body_itemprop_fallback(self):
+        body = "هذا نص خبري طويل يشرح تفاصيل القرار الحكومي وآثاره الاقتصادية على العراق " * 5
+        response = type("Response", (), {"text": f'<form><div itemprop="articleBody">{body}</div></form>', "raise_for_status": lambda self: None})()
+        with patch("article_scraper.requests.get", return_value=response):
+            self.assertIn("القرار الحكومي", fetch_article_text("https://example.com/article"))
+
     def test_category_mapper_classifies_iraq_articles_and_preserves_editorial_values(self):
         self.assertEqual(classify_category(ai_title="이라크 투자청, 100만 주택용지 가격 인하", region="이라크"), "주택")
         self.assertEqual(classify_category(ai_title="이라크 PMF, 니네와서 ISIS 조직원 체포", region="이라크"), "안보")
