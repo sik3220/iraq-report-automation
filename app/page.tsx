@@ -17,7 +17,8 @@ type Article = {
   original: string;
 };
 
-type DashboardMeta = { analysisBudget?: {usedUsd:number; monthlyUsd:number; blocked:boolean; time:string} | null; reportPeriod: { start: string; end: string }; summary: Record<string, number>; testDataCount: number; sources: Array<{ source_id: string; name: string; status: string; note: string | null; checked_at: string | null; counts: Record<string, number> }> };
+type JobRun = { job: "collection" | "analysis"; status: "running" | "success" | "failed"; started_at: string; finished_at: string | null; last_success: string | null; detail: string | null };
+type DashboardMeta = { analysisBudget?: {usedUsd:number; monthlyUsd:number; blocked:boolean; time:string} | null; reportPeriod: { start: string; end: string }; summary: Record<string, number>; testDataCount: number; sources: Array<{ source_id: string; name: string; status: string; note: string | null; checked_at: string | null; counts: Record<string, number> }>; operations?: JobRun[] };
 type ApiArticle = {
   id: number;
   category: Article["category"];
@@ -46,6 +47,10 @@ const sourceStatusStyle = (status: string) => {
   }
   return "bg-amber-100 text-amber-800";
 };
+
+const runTime = (value: string | null) => value ? new Intl.DateTimeFormat("ko-KR", {
+  timeZone: "Asia/Baghdad", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
+}).format(new Date(value)) : "기록 없음";
 
 type BodyRequest = { id: number; title: string; source: string; url: string; report_date: string; edit_revision: number };
 export default function Home() {
@@ -305,6 +310,16 @@ export default function Home() {
               매일 {dashboardMeta.analysisBudget.time} 자동 분석(바그다드) · 이번 달 예상 비용 {"$"}{dashboardMeta.analysisBudget.usedUsd.toFixed(2)} / {"$"}{dashboardMeta.analysisBudget.monthlyUsd.toFixed(2)}
               {dashboardMeta.analysisBudget.blocked && " · 예산 잔액 부족: 남은 기사는 분석 대기"}
             </p>}
+            <div className="grid gap-3 md:grid-cols-2">
+              {["collection", "analysis"].map((job) => {
+                const run = dashboardMeta.operations?.find((item) => item.job === job);
+                const healthy = run?.status === "success";
+                return <div key={job} className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between"><span className="font-semibold">{job === "collection" ? "기사 수집" : "후보 분석"}</span><span className={`rounded px-2 py-1 text-xs ${healthy ? "bg-green-100 text-green-800" : run?.status === "running" ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"}`}>{healthy ? "정상" : run?.status === "running" ? "실행 중" : run ? "확인 필요" : "기록 없음"}</span></div>
+                  <p className="mt-2 text-xs text-slate-600">마지막 정상 실행: {runTime(run?.last_success || null)}{run?.status === "failed" && run.detail ? ` · ${run.detail}` : ""}</p>
+                </div>;
+              })}
+            </div>
             {dashboardMeta.testDataCount > 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">확인된 시험 기사 {dashboardMeta.testDataCount}건(test.com)은 제외 상태입니다. 실제 출처에서 시험 수집한 기사와는 구분됩니다.</p>}
             <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
               <summary className="cursor-pointer text-sm font-semibold">출처 수집 상태 · {dashboardMeta.sources.length}개</summary>

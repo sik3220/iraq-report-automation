@@ -38,6 +38,12 @@ export async function GET(request: Request) {
     summaryRows.forEach((row) => { summary[row.status] = row.count; });
     const testData = db.prepare("SELECT COUNT(*) AS count FROM articles WHERE url = 'https://test.com' AND report_status = 'excluded'").get() as { count: number };
     const sources = db.prepare<[], { source_id: string; name: string; status: string; note: string | null; checked_at: string | null; counts: string | null }>("SELECT source_id, name, status, note, checked_at, counts FROM source_checks ORDER BY name").all().map((row: { source_id: string; name: string; status: string; note: string | null; checked_at: string | null; counts: string | null }) => ({ ...row, counts: row.counts ? JSON.parse(row.counts) : {} }));
+    const hasJobRuns = db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='job_runs'").get();
+    const operations = hasJobRuns ? db.prepare(`
+      SELECT r.job,r.status,r.started_at,r.finished_at,r.detail,
+        (SELECT MAX(s.finished_at) FROM job_runs s WHERE s.job=r.job AND s.status='success') AS last_success
+      FROM job_runs r WHERE r.id=(SELECT MAX(latest.id) FROM job_runs latest WHERE latest.job=r.job)
+      ORDER BY r.job`).all() : [];
     let analysisBudget = null;
     const configPath = path.join(process.cwd(), "deploy", "analysis-settings.json");
     if (fs.existsSync(configPath) && db.prepare("SELECT 1 FROM sqlite_master WHERE name='ai_spend'").get()) {
@@ -48,7 +54,7 @@ export async function GET(request: Request) {
       analysisBudget = { usedUsd: usage.total / 1000000, monthlyUsd: settings.monthly_usd,
         blocked: Boolean(state?.blocked), time: settings.time_baghdad };
     }
-    return Response.json({ success: true, count: articles.length, articles, needsBody, meta: { reportPeriod: period, summary, testDataCount: testData.count, sources, analysisBudget } });
+    return Response.json({ success: true, count: articles.length, articles, needsBody, meta: { reportPeriod: period, summary, testDataCount: testData.count, sources, operations, analysisBudget } });
   } catch (error) {
     console.error("Failed to load articles:", error);
     return Response.json(

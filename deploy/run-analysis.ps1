@@ -13,7 +13,7 @@ while (-not $lockStream) {
     }
 }
 try {
-    & python.exe -X utf8 scripts/process_articles.py
+    & python.exe -X utf8 scripts/run_job.py analysis scripts/process_articles.py
     exit $LASTEXITCODE
 } finally {
     $lockStream.Dispose()

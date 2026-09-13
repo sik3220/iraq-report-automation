@@ -37,6 +37,8 @@ function fixture(t) {
     VALUES (?,?,?,?,?,?)`).run(1, "source title", "AI title", "* AI detail", "source body", "included");
   db.prepare("INSERT INTO articles(id,title,report_status) VALUES (2,'excluded','excluded')").run();
   db.exec("CREATE TABLE source_checks(source_id TEXT,name TEXT,status TEXT,note TEXT,checked_at TEXT,counts TEXT)");
+  db.exec("CREATE TABLE job_runs(id INTEGER PRIMARY KEY,job TEXT,started_at TEXT,finished_at TEXT,status TEXT,detail TEXT)");
+  db.prepare("INSERT INTO job_runs VALUES (1,'collection','2026-09-13T08:00:00+03:00','2026-09-13T08:01:00+03:00','success','')").run();
   const day = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Baghdad",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
   const start = new Date(`${day}T00:00:00Z`); start.setUTCDate(start.getUTCDate() - (start.getUTCDay()+3)%7);
   db.prepare("UPDATE articles SET week_start=?").run(start.toISOString().slice(0,10));
@@ -79,6 +81,8 @@ test("edits survive a fresh connection and AI regeneration without changing sour
   assert.equal(data.articles[0].ai_title, "Saved title");
   assert.equal(data.articles[0].original, "source body");
   assert.equal(data.count, 1);
+  assert.equal(data.meta.operations[0].job, "collection");
+  assert.equal(data.meta.operations[0].status, "success");
 });
 
 test("stale edits cannot overwrite saved text; empty summary is a persistent override", async t => {

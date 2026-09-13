@@ -66,6 +66,10 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     connection.execute("""CREATE TABLE IF NOT EXISTS analysis_attempts(
         id INTEGER PRIMARY KEY,article_id INTEGER NOT NULL,day TEXT NOT NULL,
         started_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,status TEXT NOT NULL)""")
+    connection.execute("""CREATE TABLE IF NOT EXISTS job_runs(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,job TEXT NOT NULL,
+        started_at TEXT NOT NULL,finished_at TEXT,status TEXT NOT NULL,detail TEXT)""")
+    connection.execute("CREATE INDEX IF NOT EXISTS job_runs_job_id ON job_runs(job,id DESC)")
     connection.commit()
 
 

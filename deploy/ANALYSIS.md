@@ -1,5 +1,7 @@
 # 자동 분석 운영
 
+- 예약 작업 설치·복구: `powershell -ExecutionPolicy Bypass -File deploy/install-tasks.ps1`
+
 - 무료 수집: 매일 07:00~16:00 바그다드 시간, 1시간마다 실행
 - 분석: 매일 09:00·12:00·15:00·16:30 바그다드 시간, PC 로그인 상태에서 실행
 - 설정: deploy/analysis-settings.json, 월 1 USD / 일 0.25 USD

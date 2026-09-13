@@ -16,7 +16,7 @@ try {
 }
 
 try {
-    & python.exe -X utf8 scripts/run_weekly_pipeline.py --skip-ai
+    & python.exe -X utf8 scripts/run_job.py collection scripts/run_weekly_pipeline.py --skip-ai
     exit $LASTEXITCODE
 } finally {
     if ($lockStream) { $lockStream.Dispose() }

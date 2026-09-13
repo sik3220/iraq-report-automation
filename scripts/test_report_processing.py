@@ -14,10 +14,23 @@ from dedupe_review_articles import same_event
 from category_mapper import classify_category
 from article_scraper import fetch_article_text
 from rss_to_db import source_status
+from run_job import run_recorded
 import process_articles as batch
 
 
 class ReportTests(unittest.TestCase):
+    def test_job_harness_records_success_and_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "articles.db"
+            result = type("Result", (), {"returncode": 0})()
+            with patch("run_job.subprocess.run", return_value=result):
+                self.assertEqual(run_recorded("collection", ["worker.py"], path), 0)
+            result.returncode = 2
+            with patch("run_job.subprocess.run", return_value=result):
+                self.assertEqual(run_recorded("analysis", ["worker.py"], path), 2)
+            with closing(sqlite3.connect(path)) as db:
+                self.assertEqual(db.execute("SELECT job,status FROM job_runs ORDER BY id").fetchall(),
+                                 [("collection", "success"), ("analysis", "failed")])
     def test_source_status_only_warns_after_three_days(self):
         full = {"metadata_only": False}
         limited = {"metadata_only": True}
