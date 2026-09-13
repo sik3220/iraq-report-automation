@@ -227,5 +227,6 @@ test("event groups preserve updates, count distinct outlets and avoid topic chai
   const isisB = item(11, "이라크 공군 F-16, 디얄라 작전사령부 관할 Narin 지역 ISIS 은신처 완전 파괴", "964media", "2026-09-13");
   assert.equal(grouping.sameEvent(isisA, isisB), true);
   assert.equal(grouping.reportingSources(grouping.groupArticles([isisA, isisB])[0]).length, 2);
-  assert.equal(grouping.sameEvent(isisA, item(12, isisB.title, "964media", "2026-09-14")), false);
+  assert.equal(grouping.sameEvent(isisA, item(12, isisB.title, "964media", "2026-09-14")), false);  assert.equal(grouping.sameEvent(item(13, "이라크 석유부, SOMO 원유 수출 확대 계획 발표", "INA", "2026-09-13"), item(14, "SOMO, 이라크 원유 수출 확대 계획 공개", "Shafaq", "2026-09-13")), true);
+  assert.equal(grouping.sameEvent(item(15, "이라크 정부, 예산안 논의", "INA", "2026-09-13"), item(16, "이라크 정부, 공항 공격 발생", "Shafaq", "2026-09-13")), false);
 });
