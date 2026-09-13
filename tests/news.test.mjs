@@ -223,4 +223,9 @@ test("event groups preserve updates, count distinct outlets and avoid topic chai
   assert.equal(grouping.sameEvent(a,item(7,"이란, 호르무즈 통항 제한·대미 미사일 경고")),false);
   assert.equal(grouping.sameEvent(a,item(8,a.title,"INA","게시일 미확인")),false);
   assert.equal(grouping.groupArticles([a,b,item(9,"이라크 항만공사, 호르무즈 폐쇄 대응책 논의")]).length,2);
+  const isisA = item(10, "이라크 공군 F-16, 군 정보·공중감시 기반 Diyala ISIS 은신처 파괴", "Kurdistan24", "2026-09-13");
+  const isisB = item(11, "이라크 공군 F-16, 디얄라 작전사령부 관할 Narin 지역 ISIS 은신처 완전 파괴", "964media", "2026-09-13");
+  assert.equal(grouping.sameEvent(isisA, isisB), true);
+  assert.equal(grouping.reportingSources(grouping.groupArticles([isisA, isisB])[0]).length, 2);
+  assert.equal(grouping.sameEvent(isisA, item(12, isisB.title, "964media", "2026-09-14")), false);
 });

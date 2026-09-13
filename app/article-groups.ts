@@ -1,4 +1,4 @@
-type Candidate = { id: number; title: string; date: string; source: string };
+type Candidate = { id: number; title: string; date: string; source: string; originalTitle?: string };
 
 function eventText(title: string) {
   return title.normalize("NFKC").toLowerCase()
@@ -10,9 +10,22 @@ function eventText(title: string) {
     .replace(/[^\p{L}\p{N}]/gu, "");
 }
 
+function combinedText(article: Candidate) {
+  return [article.title, article.originalTitle || ""].join(" ");
+}
+
+function sameSecurityStrike(a: Candidate, b: Candidate) {
+  const left = combinedText(a), right = combinedText(b);
+  const isIsis = (text: string) => /\bisis\b|\bis\b|داعش|이슬람국가|테러조직/.test(text.toLowerCase());
+  const isDiyala = (text: string) => /diyala|디얄라|ديالى/.test(text.toLowerCase());
+  const isAirstrike = (text: string) => /f[- ]?16|공군|공습|airstrike|air ?strike|은신처|hideout|미사일|missile/.test(text.toLowerCase());
+  return isIsis(left) && isIsis(right) && isDiyala(left) && isDiyala(right) && isAirstrike(left) && isAirstrike(right);
+}
+
 export function sameEvent(a: Candidate, b: Candidate) {
   // ponytail: conservative headline heuristic; add reviewed event IDs if ambiguous matches become common.
   if (!/^\d{4}-\d{2}-\d{2}$/.test(a.date) || a.date !== b.date) return false;
+  if (sameSecurityStrike(a, b)) return true;
   const left = eventText(a.title), right = eventText(b.title);
   if (Math.min(left.length, right.length) < 12) return false;
   if ((a.title.match(/\d+(?:[.,]\d+)*/g) || []).join("|") !== (b.title.match(/\d+(?:[.,]\d+)*/g) || []).join("|")) return false;
