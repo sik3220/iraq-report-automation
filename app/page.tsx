@@ -280,33 +280,38 @@ export default function Home() {
   }
 
   if (authRequired) return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-100 px-6">
-      <form className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-sm" onSubmit={(event) => { event.preventDefault(); void login(); }}>
-        <h1 className="text-xl font-bold text-slate-900">주간정보보고 자동화</h1>
+    <main className="flex min-h-screen items-center justify-center bg-[#f6f5f2] px-6">
+      <form className="w-full max-w-sm rounded-2xl border border-[#e7e3dc] border-t-4 border-t-[#f37321] bg-white p-6 shadow-[0_16px_40px_rgba(30,30,30,0.08)]" onSubmit={(event) => { event.preventDefault(); void login(); }}>
+        <h1 className="text-xl font-bold text-slate-900">이라크 주간정보보고</h1>
         <p className="mt-2 text-sm text-slate-600">대시보드 비밀번호를 입력해 주세요.</p>
         <label className="mt-5 block text-sm font-semibold" htmlFor="dashboard-password">비밀번호</label>
-        <input id="dashboard-password" type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2" autoFocus />
+        <input id="dashboard-password" type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} className="mt-2 w-full rounded-lg border border-[#d8d4cd] px-3 py-2 outline-none focus:border-[#f37321] focus:ring-2 focus:ring-[#fde5d5]" autoFocus />
         {loginError && <p className="mt-2 text-sm text-red-700" role="alert">{loginError}</p>}
-        <button type="submit" disabled={isLoggingIn || !loginPassword} className="mt-4 w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{isLoggingIn ? "확인 중..." : "로그인"}</button>
+        <button type="submit" disabled={isLoggingIn || !loginPassword} className="mt-4 w-full rounded-lg bg-[#f37321] px-4 py-2 text-sm font-bold text-white hover:bg-[#dd6419] disabled:opacity-50">{isLoggingIn ? "확인 중..." : "로그인"}</button>
       </form>
     </main>
   );
 
   return (
-    <main className="min-h-screen bg-slate-100 text-slate-900">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <header className="mb-6 rounded-xl bg-slate-900 px-6 py-5 text-white">
-          <h1 className="text-2xl font-bold">주간정보보고 자동화</h1>
-          <p className="mt-1 text-sm text-slate-300">
-            Iraq Weekly Intelligence Report Automation
-          </p>
+    <main className="min-h-screen bg-[#f6f5f2] text-slate-950">
+      <div className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
+        <header className="mb-6 overflow-hidden rounded-2xl border border-[#e7e3dc] bg-white shadow-[0_8px_30px_rgba(30,30,30,0.05)]">
+          <div className="h-1.5 bg-[#f37321]" />
+          <div className="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-bold tracking-[0.24em] text-[#f37321]">HANWHA</p>
+              <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">이라크 주간정보보고</h1>
+              <p className="mt-1 text-sm text-slate-500">주간 종합상황보고 작성 지원 대시보드</p>
+            </div>
+            <div className="w-fit rounded-full bg-[#f3f1ed] px-3 py-1.5 text-xs font-semibold text-[#353968]">바그다드 시간 기준</div>
+          </div>
         </header>
 
         {dashboardMeta && (
           <section className="mb-6 space-y-4">
-            <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4"><p className="text-xs font-semibold text-blue-700">현재 보고 기간</p><p className="mt-1 text-lg font-bold text-blue-950">{dashboardMeta.reportPeriod.start} ~ {dashboardMeta.reportPeriod.end}</p><p className="mt-1 text-xs text-blue-800">목요일~수요일 · 바그다드 시간 기준</p></div>
-            <div className="grid gap-3 md:grid-cols-4">{[["이번 주 후보 기사", dashboardMeta.summary.included || 0], ["분석 대기", dashboardMeta.summary.pending || 0], ["본문·출처 확인 대기", dashboardMeta.summary.review || 0], ["제외·중복", (dashboardMeta.summary.excluded || 0) + (dashboardMeta.summary.duplicate || 0)]].map(([label, count]) => <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold">{count}</p></div>)}</div>
-            {dashboardMeta.analysisBudget && <p className="text-sm text-slate-600">
+            <div className="rounded-2xl bg-[#353968] px-5 py-5 text-white shadow-[0_8px_24px_rgba(53,57,104,0.16)]"><p className="text-xs font-bold tracking-wide text-[#f7a36d]">현재 보고 기간</p><p className="mt-1 text-xl font-bold tracking-tight text-white">{dashboardMeta.reportPeriod.start} ~ {dashboardMeta.reportPeriod.end}</p><p className="mt-1 text-xs text-slate-300">목요일~수요일 · 바그다드 시간 기준</p></div>
+            <div className="grid gap-3 md:grid-cols-4">{[["이번 주 후보 기사", dashboardMeta.summary.included || 0], ["분석 대기", dashboardMeta.summary.pending || 0], ["본문·출처 확인 대기", dashboardMeta.summary.review || 0], ["제외·중복", (dashboardMeta.summary.excluded || 0) + (dashboardMeta.summary.duplicate || 0)]].map(([label, count]) => <div key={label} className="rounded-xl border border-[#e7e3dc] bg-white px-4 py-3 shadow-[0_4px_16px_rgba(30,30,30,0.035)]"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold">{count}</p></div>)}</div>
+            {dashboardMeta.analysisBudget && <p className="rounded-xl border border-[#e7e3dc] bg-white px-4 py-3 text-sm text-slate-600 shadow-[0_4px_16px_rgba(30,30,30,0.035)]">
               매일 {dashboardMeta.analysisBudget.time} 자동 분석(바그다드) · 이번 달 예상 비용 {"$"}{dashboardMeta.analysisBudget.usedUsd.toFixed(2)} / {"$"}{dashboardMeta.analysisBudget.monthlyUsd.toFixed(2)}
               {dashboardMeta.analysisBudget.blocked && " · 예산 잔액 부족: 남은 기사는 분석 대기"}
             </p>}
@@ -314,18 +319,18 @@ export default function Home() {
               {["collection", "analysis"].map((job) => {
                 const run = dashboardMeta.operations?.find((item) => item.job === job);
                 const healthy = run?.status === "success";
-                return <div key={job} className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm">
-                  <div className="flex items-center justify-between"><span className="font-semibold">{job === "collection" ? "기사 수집" : "후보 분석"}</span><span className={`rounded px-2 py-1 text-xs ${healthy ? "bg-green-100 text-green-800" : run?.status === "running" ? "bg-blue-100 text-blue-800" : "bg-amber-100 text-amber-800"}`}>{healthy ? "정상" : run?.status === "running" ? "실행 중" : run ? "확인 필요" : "기록 없음"}</span></div>
+                return <div key={job} className="rounded-xl border border-[#e7e3dc] bg-white px-4 py-3 text-sm shadow-[0_4px_16px_rgba(30,30,30,0.035)]">
+                  <div className="flex items-center justify-between"><span className="font-semibold">{job === "collection" ? "기사 수집" : "후보 분석"}</span><span className={`rounded px-2 py-1 text-xs ${healthy ? "bg-green-100 text-green-800" : run?.status === "running" ? "bg-[#fff0e6] text-[#b74e0d]" : "bg-amber-100 text-amber-800"}`}>{healthy ? "정상" : run?.status === "running" ? "실행 중" : run ? "확인 필요" : "기록 없음"}</span></div>
                   <p className="mt-2 text-xs text-slate-600">마지막 정상 실행: {runTime(run?.last_success || null)}{run?.status === "failed" && run.detail ? ` · ${run.detail}` : ""}</p>
                 </div>;
               })}
             </div>
             {dashboardMeta.testDataCount > 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">확인된 시험 기사 {dashboardMeta.testDataCount}건(test.com)은 제외 상태입니다. 실제 출처에서 시험 수집한 기사와는 구분됩니다.</p>}
-            <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+            <details className="rounded-2xl border border-[#e7e3dc] bg-white px-4 py-3 shadow-[0_4px_16px_rgba(30,30,30,0.035)]">
               <summary className="cursor-pointer text-sm font-semibold">출처 수집 상태 · {dashboardMeta.sources.length}개</summary>
               <div className="mt-3 flex flex-wrap gap-2">
                 {dashboardMeta.sources.map((source) => (
-                  <details key={source.source_id} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                  <details key={source.source_id} className="rounded-lg border border-transparent bg-[#f7f6f3] px-3 py-2 text-sm open:border-[#f4c6a8] open:bg-[#fff8f3]">
                     <summary className="cursor-pointer list-none whitespace-nowrap">
                       <span className="mr-2 font-medium">{source.name}</span>
                       <span className={`rounded px-2 py-1 text-xs ${sourceStatusStyle(source.status)}`}>
@@ -346,13 +351,13 @@ export default function Home() {
           </section>
         )}
 
-        <details className="mb-6 rounded-xl border border-amber-200 bg-white p-4">
+        <details className="mb-6 rounded-2xl border border-[#e7e3dc] bg-white p-4 shadow-[0_4px_16px_rgba(30,30,30,0.035)]">
           <summary className="cursor-pointer font-semibold">원문 자동 처리 현황</summary>
           <p className="my-3 text-sm text-slate-600">제목만 확보된 출처나 자동 본문 확보에 실패한 기사가 포함된 수입니다. 원문이 확보된 기사는 분석 대기로 이동하고, 끝까지 확보하지 못한 중요 기사만 직접 확인할 수 있습니다.</p>
           {needsBody.map((item) => <div key={item.id} className="border-t py-3">
             <p className="text-xs text-slate-500">{item.source} · {item.report_date}</p>
             <p className="my-1 font-medium">{item.title}</p>
-            {/^https?:\/\//.test(item.url) && <a href={item.url} target="_blank" rel="noopener noreferrer" className="mr-4 text-sm text-blue-700">기사 링크 열기</a>}
+            {/^https?:\/\//.test(item.url) && <a href={item.url} target="_blank" rel="noopener noreferrer" className="mr-4 text-sm font-medium text-[#b74e0d] hover:text-[#f37321]">기사 링크 열기</a>}
             <button className="rounded border px-3 py-1 text-sm" onClick={() => { setBodyArticle(item); setBodyText(""); setBodyError(""); }}>본문 붙여 넣기</button>
           </div>)}
         </details>
@@ -361,7 +366,7 @@ export default function Home() {
           {Object.entries(categoryCounts).map(([label, count]) => (
             <div
               key={label}
-              className="rounded-lg border border-slate-200 bg-white px-4 py-3"
+              className={`rounded-xl border px-4 py-3 shadow-[0_4px_16px_rgba(30,30,30,0.035)] ${label === "선택" ? "border-[#f37321] bg-[#fff8f3]" : "border-[#e7e3dc] bg-white"}`}
             >
               <p className="text-xs text-slate-500">{label}</p>
               <p className="mt-1 text-xl font-bold">{count}</p>
@@ -375,13 +380,13 @@ export default function Home() {
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="제목·출처·요약 검색"
-            className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="flex-1 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#f37321] focus:ring-2 focus:ring-[#fde5d5]"
           />
 
           <select
             value={selectedCategory}
             onChange={(event) => setSelectedCategory(event.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-blue-500"
+            className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm outline-none focus:border-[#f37321]"
           >
             <option value="전체">전체</option>
             <option value="정치">정치</option>
@@ -404,13 +409,13 @@ export default function Home() {
             <button key={value} aria-pressed={periodView === value} onClick={() => {
               if (periodView === value) return;
               setIsLoading(true); setLoadError(null); setArticles([]); setSelectedIds([]); setPeriodView(value);
-            }} className={`rounded-lg px-4 py-2 text-sm ${periodView === value ? 'bg-slate-900 text-white' : 'bg-white border border-slate-300'}`}>{label}</button>
+            }} className={`rounded-lg px-4 py-2 text-sm ${periodView === value ? 'bg-[#353968] text-white shadow-sm' : 'border border-[#d8d4cd] bg-white text-slate-600 hover:border-[#353968]'}`}>{label}</button>
           ))}
           </div>
           <button
             onClick={generateWord}
             disabled={selectedIds.length === 0 || isGenerating}
-            className="ml-auto whitespace-nowrap rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+            className="ml-auto whitespace-nowrap rounded-lg bg-[#f37321] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#dd6419] disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             {isGenerating ? "Word 생성 중…" : `선택 기사 ${selectedIds.length}건 Word 생성`}
           </button>
@@ -429,7 +434,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={retryLoad}
-                className="mt-3 rounded-md bg-slate-900 px-4 py-2 text-sm text-white"
+                className="mt-3 rounded-md bg-[#353968] px-4 py-2 text-sm font-semibold text-white"
               >
                 다시 시도
               </button>
@@ -453,9 +458,9 @@ export default function Home() {
             return (
               <article
                 key={article.id}
-                className={`rounded-xl border bg-white p-4 ${
+                className={`rounded-xl border bg-white p-4 shadow-[0_4px_18px_rgba(30,30,30,0.035)] ${
                   isSelected
-                    ? "border-blue-500 ring-1 ring-blue-200"
+                    ? "border-[#f37321] ring-2 ring-[#fde5d5]"
                     : "border-slate-200"
                 }`}
               >
@@ -465,7 +470,7 @@ export default function Home() {
                     checked={isSelected}
                     aria-label={`${displayTitle} 선택`}
                     onChange={() => toggleArticle(article.id)}
-                    className="mt-1 h-4 w-4"
+                    className="mt-1 h-4 w-4 accent-[#f37321]"
                   />
 
                   <div className="min-w-0 flex-1">
@@ -478,16 +483,16 @@ export default function Home() {
                     </div>
 
                     <h2 className="text-base font-semibold">{displayTitle}</h2>
-                    {group.length > 1 && <details className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm">
-                      <summary className="cursor-pointer font-medium text-blue-800">{sources.length}개 언론사 보도{group.slice(1).some(item => selectedIds.includes(item.id)) ? " · 추가 기사 선택됨" : ""}</summary>
+                    {group.length > 1 && <details className="mt-2 rounded-lg border border-[#f4c6a8] bg-[#fff8f3] px-3 py-2 text-sm">
+                      <summary className="cursor-pointer font-semibold text-[#b74e0d]">{sources.length}개 언론사 보도{group.slice(1).some(item => selectedIds.includes(item.id)) ? " · 추가 기사 선택됨" : ""}</summary>
                       <p className="mt-2 text-xs text-slate-600">{sources.join(" · ")} · 유사 제목 기준 묶음이며 독립 검증을 뜻하지 않습니다</p>
-                      {group.map(item => <div key={item.id} className="mt-3 border-t border-blue-100 pt-2">
+                      {group.map(item => <div key={item.id} className="mt-3 border-t border-[#f4d5c1] pt-2">
                         <label className="flex items-start gap-2">
-                          <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleArticle(item.id)} className="mt-1" />
+                          <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleArticle(item.id)} className="mt-1 accent-[#f37321]" />
                           <span><span className="text-xs text-slate-500">{item.source} · {item.date}</span><br />{getDisplayTitle(item)}</span>
                         </label>
                         {item.summary.map((line, index) => <p key={index} className="mt-1 text-xs leading-5 text-slate-700">{line}</p>)}
-                        <div className="mt-2 flex gap-3 text-xs text-blue-800">
+                        <div className="mt-2 flex gap-3 text-xs font-medium text-[#b74e0d]">
                           <button onClick={() => setOriginalArticle(item)}>원문보기</button>
                           <button onClick={() => openEdit(item)}>편집</button>
                         </div>
@@ -511,14 +516,14 @@ export default function Home() {
                     <div className="mt-3 flex gap-2">
                       <button
                         onClick={() => setOriginalArticle(article)}
-                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50"
+                        className="rounded-md border border-[#d8d4cd] px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-[#f37321] hover:bg-[#fff8f3] hover:text-[#b74e0d]"
                       >
                         원문보기
                       </button>
 
                       <button
                         onClick={() => openEdit(article)}
-                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-50"
+                        className="rounded-md border border-[#d8d4cd] px-3 py-1.5 text-xs font-medium text-slate-600 hover:border-[#f37321] hover:bg-[#fff8f3] hover:text-[#b74e0d]"
                       >
                         편집
                       </button>
@@ -539,7 +544,7 @@ export default function Home() {
           <label htmlFor="article-body" className="text-sm">원문 본문 (100~100,000자)</label>
           <textarea id="article-body" rows={12} maxLength={100000} disabled={bodySaving} value={bodyText} onChange={event => setBodyText(event.target.value)} className="mt-2 w-full rounded border p-3" />
           {bodyError && <p role="alert" className="text-red-700">{bodyError}</p>}
-          <div className="mt-3 flex justify-end gap-3"><button disabled={bodySaving} onClick={() => setBodyArticle(null)}>취소</button><button disabled={bodySaving || bodyText.trim().length < 100} onClick={saveBody} className="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-50">{bodySaving ? "저장 중…" : "저장 · 분석 대기로 이동"}</button></div>
+          <div className="mt-3 flex justify-end gap-3"><button disabled={bodySaving} onClick={() => setBodyArticle(null)}>취소</button><button disabled={bodySaving || bodyText.trim().length < 100} onClick={saveBody} className="rounded bg-[#f37321] px-4 py-2 font-semibold text-white hover:bg-[#dd6419] disabled:opacity-50">{bodySaving ? "저장 중…" : "저장 · 분석 대기로 이동"}</button></div>
         </div>
       </div>}
       {originalArticle && (
@@ -583,7 +588,7 @@ export default function Home() {
               maxLength={200}
               value={editTitle}
               onChange={(event) => setEditTitle(event.target.value)}
-              className="mb-4 w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500"
+              className="mb-4 w-full rounded-lg border border-slate-300 px-4 py-3 text-sm outline-none focus:border-[#f37321]"
             />
 
             <label htmlFor="edit-summary" className="mb-2 block text-sm font-semibold">
@@ -596,7 +601,7 @@ export default function Home() {
               value={editSummary}
               onChange={(event) => setEditSummary(event.target.value)}
               rows={8}
-              className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm leading-7 outline-none focus:border-blue-500"
+              className="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm leading-7 outline-none focus:border-[#f37321]"
               placeholder="* 사실 내용&#10;☞ 전망·분석·시사점"
             />
 
@@ -620,7 +625,7 @@ export default function Home() {
               <button
                 disabled={isSaving}
                 onClick={saveEdit}
-                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
+                className="rounded-md bg-[#f37321] px-4 py-2 text-sm font-semibold text-white hover:bg-[#dd6419]"
               >
                 {isSaving ? "저장 중…" : "저장"}
               </button>
