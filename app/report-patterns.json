@@ -1,0 +1,692 @@
+{
+  "section": {
+    "type": "element",
+    "name": "w:p",
+    "elements": [
+      {
+        "type": "element",
+        "name": "w:pPr",
+        "elements": [
+          {
+            "type": "element",
+            "name": "w:numPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:ilvl",
+                "attributes": {
+                  "w:val": "0"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:numId",
+                "attributes": {
+                  "w:val": "1"
+                }
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "name": "w:spacing",
+            "attributes": {
+              "w:after": "240",
+              "w:line": "240",
+              "w:lineRule": "auto"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:ind",
+            "attributes": {
+              "w:left": "426",
+              "w:hanging": "437"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:jc",
+            "attributes": {
+              "w:val": "both"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:rPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:rFonts",
+                "attributes": {
+                  "w:ascii": "바탕",
+                  "w:eastAsia": "바탕",
+                  "w:hAnsi": "바탕",
+                  "w:cs": "Times New Roman"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:b"
+              },
+              {
+                "type": "element",
+                "name": "w:sz",
+                "attributes": {
+                  "w:val": "32"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:szCs",
+                "attributes": {
+                  "w:val": "28"
+                }
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "name": "w:keepNext"
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "name": "w:r",
+        "elements": [
+          {
+            "type": "element",
+            "name": "w:rPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:rFonts",
+                "attributes": {
+                  "w:ascii": "바탕",
+                  "w:eastAsia": "바탕",
+                  "w:hAnsi": "바탕",
+                  "w:cs": "Times New Roman",
+                  "w:hint": "eastAsia"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:b"
+              },
+              {
+                "type": "element",
+                "name": "w:sz",
+                "attributes": {
+                  "w:val": "32"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:szCs",
+                "attributes": {
+                  "w:val": "28"
+                }
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "name": "w:t",
+            "attributes": {
+              "xml:space": "preserve"
+            },
+            "elements": [
+              {
+                "type": "text",
+                "text": "__TEXT__"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "subsection": {
+    "type": "element",
+    "name": "w:p",
+    "elements": [
+      {
+        "type": "element",
+        "name": "w:pPr",
+        "elements": [
+          {
+            "type": "element",
+            "name": "w:numPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:ilvl",
+                "attributes": {
+                  "w:val": "1"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:numId",
+                "attributes": {
+                  "w:val": "1"
+                }
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "name": "w:spacing",
+            "attributes": {
+              "w:before": "240",
+              "w:line": "276",
+              "w:lineRule": "auto"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:ind",
+            "attributes": {
+              "w:left": "567",
+              "w:hanging": "403"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:jc",
+            "attributes": {
+              "w:val": "both"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:rPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:rFonts",
+                "attributes": {
+                  "w:ascii": "바탕",
+                  "w:eastAsia": "바탕",
+                  "w:hAnsi": "바탕",
+                  "w:cs": "Times New Roman"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:b"
+              },
+              {
+                "type": "element",
+                "name": "w:sz",
+                "attributes": {
+                  "w:val": "28"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:szCs",
+                "attributes": {
+                  "w:val": "28"
+                }
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "name": "w:keepNext"
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "name": "w:r",
+        "elements": [
+          {
+            "type": "element",
+            "name": "w:rPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:rFonts",
+                "attributes": {
+                  "w:ascii": "바탕",
+                  "w:eastAsia": "바탕",
+                  "w:hAnsi": "바탕",
+                  "w:cs": "Times New Roman",
+                  "w:hint": "eastAsia"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:b"
+              },
+              {
+                "type": "element",
+                "name": "w:sz",
+                "attributes": {
+                  "w:val": "28"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:szCs",
+                "attributes": {
+                  "w:val": "28"
+                }
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "name": "w:t",
+            "attributes": {
+              "xml:space": "preserve"
+            },
+            "elements": [
+              {
+                "type": "text",
+                "text": "__TEXT__"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "topic": {
+    "type": "element",
+    "name": "w:p",
+    "elements": [
+      {
+        "type": "element",
+        "name": "w:pPr",
+        "elements": [
+          {
+            "type": "element",
+            "name": "w:pStyle",
+            "attributes": {
+              "w:val": "a4"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:numPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:ilvl",
+                "attributes": {
+                  "w:val": "0"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:numId",
+                "attributes": {
+                  "w:val": "2"
+                }
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "name": "w:spacing",
+            "attributes": {
+              "w:before": "200",
+              "w:after": "160",
+              "w:line": "276",
+              "w:lineRule": "auto"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:ind",
+            "attributes": {
+              "w:leftChars": "0",
+              "w:left": "792"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:jc",
+            "attributes": {
+              "w:val": "both"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:rPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:rFonts",
+                "attributes": {
+                  "w:ascii": "바탕",
+                  "w:eastAsia": "바탕",
+                  "w:hAnsi": "바탕",
+                  "w:cs": "Times New Roman"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:bCs"
+              },
+              {
+                "type": "element",
+                "name": "w:sz",
+                "attributes": {
+                  "w:val": "28"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:szCs",
+                "attributes": {
+                  "w:val": "28"
+                }
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "name": "w:keepNext"
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "name": "w:r",
+        "elements": [
+          {
+            "type": "element",
+            "name": "w:rPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:rFonts",
+                "attributes": {
+                  "w:ascii": "바탕",
+                  "w:eastAsia": "바탕",
+                  "w:hAnsi": "바탕",
+                  "w:cs": "Times New Roman",
+                  "w:hint": "eastAsia"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:bCs"
+              },
+              {
+                "type": "element",
+                "name": "w:sz",
+                "attributes": {
+                  "w:val": "28"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:szCs",
+                "attributes": {
+                  "w:val": "28"
+                }
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "name": "w:t",
+            "attributes": {
+              "xml:space": "preserve"
+            },
+            "elements": [
+              {
+                "type": "text",
+                "text": "__TEXT__"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "article": {
+    "type": "element",
+    "name": "w:p",
+    "elements": [
+      {
+        "type": "element",
+        "name": "w:pPr",
+        "elements": [
+          {
+            "type": "element",
+            "name": "w:pStyle",
+            "attributes": {
+              "w:val": "a4"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:numPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:ilvl",
+                "attributes": {
+                  "w:val": "1"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:numId",
+                "attributes": {
+                  "w:val": "2"
+                }
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "name": "w:shd",
+            "attributes": {
+              "w:val": "clear",
+              "w:color": "auto",
+              "w:fill": "FFFFFF"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:spacing",
+            "attributes": {
+              "w:after": "160"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:ind",
+            "attributes": {
+              "w:leftChars": "0",
+              "w:left": "1276"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:rPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:rFonts",
+                "attributes": {
+                  "w:ascii": "바탕",
+                  "w:eastAsia": "바탕",
+                  "w:hAnsi": "바탕",
+                  "w:cs": "Times New Roman"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:bCs"
+              },
+              {
+                "type": "element",
+                "name": "w:iCs"
+              },
+              {
+                "type": "element",
+                "name": "w:kern",
+                "attributes": {
+                  "w:val": "0"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:sz",
+                "attributes": {
+                  "w:val": "26"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:szCs",
+                "attributes": {
+                  "w:val": "26"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "name": "w:r",
+        "elements": [
+          {
+            "type": "element",
+            "name": "w:rPr",
+            "elements": [
+              {
+                "type": "element",
+                "name": "w:rFonts",
+                "attributes": {
+                  "w:ascii": "바탕",
+                  "w:eastAsia": "바탕",
+                  "w:hAnsi": "바탕",
+                  "w:cs": "Times New Roman",
+                  "w:hint": "eastAsia"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:bCs"
+              },
+              {
+                "type": "element",
+                "name": "w:iCs"
+              },
+              {
+                "type": "element",
+                "name": "w:kern",
+                "attributes": {
+                  "w:val": "0"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:sz",
+                "attributes": {
+                  "w:val": "28"
+                }
+              },
+              {
+                "type": "element",
+                "name": "w:szCs",
+                "attributes": {
+                  "w:val": "28"
+                }
+              }
+            ]
+          },
+          {
+            "type": "element",
+            "name": "w:t",
+            "attributes": {
+              "xml:space": "preserve"
+            },
+            "elements": [
+              {
+                "type": "text",
+                "text": "__TEXT__"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "detail": {
+    "type": "element",
+    "name": "w:r",
+    "elements": [
+      {
+        "type": "element",
+        "name": "w:rPr",
+        "elements": [
+          {
+            "type": "element",
+            "name": "w:rFonts",
+            "attributes": {
+              "w:ascii": "바탕",
+              "w:eastAsia": "바탕",
+              "w:hAnsi": "바탕",
+              "w:cs": "Times New Roman",
+              "w:hint": "eastAsia"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:bCs"
+          },
+          {
+            "type": "element",
+            "name": "w:iCs"
+          },
+          {
+            "type": "element",
+            "name": "w:kern",
+            "attributes": {
+              "w:val": "0"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:sz",
+            "attributes": {
+              "w:val": "26"
+            }
+          },
+          {
+            "type": "element",
+            "name": "w:szCs",
+            "attributes": {
+              "w:val": "26"
+            }
+          }
+        ]
+      },
+      {
+        "type": "element",
+        "name": "w:t",
+        "attributes": {
+          "xml:space": "preserve"
+        },
+        "elements": [
+          {
+            "type": "text",
+            "text": "__TEXT__"
+          }
+        ]
+      }
+    ]
+  }
+}

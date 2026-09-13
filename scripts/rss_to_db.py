@@ -4,7 +4,7 @@ import json
 import re
 import sqlite3
 from contextlib import closing
-from datetime import datetime
+from datetime import date, datetime
 from urllib.parse import urljoin, urlsplit
 
 import feedparser
@@ -33,6 +33,12 @@ WORLD_PRIORITY_TERMS = {
 def world_priority_score(title, excerpt):
     text = f"{title} {excerpt}".lower()
     return sum(weight for term, weight in WORLD_PRIORITY_TERMS.items() if term in text)
+
+def source_status(source, latest, reference_day=None):
+    """Separate a working limited feed from a feed that has actually stopped updating."""
+    if latest and (date.fromisoformat(reference_day or today()) - date.fromisoformat(latest)).days >= 3:
+        return "stale"
+    return "metadata" if source.get("metadata_only") else "ok"
 
 
 def request_page(url):
@@ -154,9 +160,9 @@ def save_rss_articles(week_of: str | None = None, selected_sources: list[str] | 
                         counts[outcome] = counts.get(outcome, 0) + 1
                     dated = [article_date(e.get("published") or e.get("updated"), None)[0] for e in entries]
                     latest = max((d for d in dated if d), default=None)
-                    status = "stale" if latest and latest < start else "metadata" if source.get("metadata_only") else "ok"
+                    status = source_status(source, latest)
                     if status == "stale":
-                        note = f"RSS 최신 게시일 {latest} — 선택 주간보다 오래됨"
+                        note = f"RSS 최신 게시일 {latest} — 3일 이상 갱신 없음"
                     elif source["type"] == "listing":
                         detail = source.get("note", "")
                         note = "게시일 확인 전: 수집일 기준으로 표시"

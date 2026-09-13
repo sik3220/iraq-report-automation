@@ -43,8 +43,14 @@ next-env.d.ts
 # Python
 __pycache__/
 *.pyc
+# Local runtime data
+/data/articles.db
+
 # Local article backups
 /data/backups/
 
 !.env.example
 /data/pipeline.lock
+
+# Local document previews
+/tmp/

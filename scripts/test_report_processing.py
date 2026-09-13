@@ -13,10 +13,18 @@ from report_style import normalize_summary
 from dedupe_review_articles import same_event
 from category_mapper import classify_category
 from article_scraper import fetch_article_text
+from rss_to_db import source_status
 import process_articles as batch
 
 
 class ReportTests(unittest.TestCase):
+    def test_source_status_only_warns_after_three_days(self):
+        full = {"metadata_only": False}
+        limited = {"metadata_only": True}
+        self.assertEqual(source_status(full, "2026-09-09", "2026-09-10"), "ok")
+        self.assertEqual(source_status(limited, "2026-09-09", "2026-09-10"), "metadata")
+        self.assertEqual(source_status(full, "2026-09-07", "2026-09-10"), "stale")
+
     def test_article_body_itemprop_fallback(self):
         body = "هذا نص خبري طويل يشرح تفاصيل القرار الحكومي وآثاره الاقتصادية على العراق " * 5
         response = type("Response", (), {"text": f'<form><div itemprop="articleBody">{body}</div></form>', "raise_for_status": lambda self: None})()

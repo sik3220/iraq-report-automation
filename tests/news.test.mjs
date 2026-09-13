@@ -12,11 +12,13 @@ import React from "react";
 const loadCommonJs = createRequire(import.meta.url);
 function compiled(file) {
   return ts.transpileModule(fs.readFileSync(file, "utf8"), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
 }
 const formatting = {};
 vm.runInNewContext(compiled("app/report-format.ts"), { exports: formatting });
+const grouping = {};
+vm.runInNewContext(compiled("app/article-groups.ts"), { exports: grouping });
 const routeCode = compiled("app/api/news/route.ts");
 const authStub = { isAuthenticated: () => true };
 
@@ -137,7 +139,7 @@ function editor(fetch) {
   const exports = {};
   vm.runInNewContext(compiled("app/page.tsx"), {
     exports, fetch, AbortController, setTimeout, clearTimeout,
-    require: name => name === "./report-format" ? formatting : name === "react" ? {
+    require: name => name === "./report-export" ? {} : name === "./article-groups" ? grouping : name === "./report-format" ? formatting : name === "react" ? {
       ...React, useEffect() {}, useMemo: fn => fn(),
       useState(initial) {
         const slot = index++;
@@ -200,3 +202,21 @@ test("editor preserves draft text and stays open after a save failure", async ()
   const row=check.prepare("SELECT original,report_status FROM articles WHERE id=3").get(); check.close();
   assert.equal(row.original,payload.body.trim()); assert.equal(row.report_status,"pending");
  });
+
+
+test("event groups preserve updates, count distinct outlets and avoid topic chaining", () => {
+  const item = (id, title, source = "INA", date = "2026-09-09") => ({id, title, source, date});
+  const a = item(1, "미 중부사령부, 이란 유조선 5척 파괴 발표");
+  const b = item(2, "미군, 이란 원유 유조선 5척 파괴 발표", "Alsumaria");
+  const c = item(3, b.title, "Alsumaria");
+  const groups = grouping.groupArticles([c,b,a]);
+  assert.equal(groups.length,1);
+  assert.equal(groups[0][0].id,1);
+  assert.equal(grouping.reportingSources(groups[0]).length,2);
+  assert.equal(grouping.sameEvent(a,item(4,a.title.replace("5척","6척"))),false);
+  assert.equal(grouping.sameEvent(a,item(5,a.title,"INA","2026-09-10")),false);
+  assert.equal(grouping.sameEvent(a,item(6,a.title + " 부인")),false);
+  assert.equal(grouping.sameEvent(a,item(7,"이란, 호르무즈 통항 제한·대미 미사일 경고")),false);
+  assert.equal(grouping.sameEvent(a,item(8,a.title,"INA","게시일 미확인")),false);
+  assert.equal(grouping.groupArticles([a,b,item(9,"이라크 항만공사, 호르무즈 폐쇄 대응책 논의")]).length,2);
+});

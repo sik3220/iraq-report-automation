@@ -1,14 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { groupArticles, reportingSources } from "./article-groups";
 import { normalizeReportLine, summaryLines } from "./report-format";
-import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  AlignmentType,
-} from "docx";
+import { createReport } from "./report-export";
 
 type Article = {
   id: number;
@@ -41,11 +36,11 @@ const getDisplayTitle = (article: Pick<Article, "title" | "originalTitle">) =>
 
 const sourceStatusLabel = (status: string) => ({
   ok: "정상", disabled: "비활성", stale: "오래된 피드", unchecked: "미확인",
-  metadata: "제목 수집", error: "연결 오류",
+  metadata: "목록 정상", error: "연결 오류",
 })[status] || "확인 필요";
 
 const sourceStatusStyle = (status: string) => {
-  if (status === "ok") return "bg-green-100 text-green-800";
+  if (status === "ok" || status === "metadata") return "bg-green-100 text-green-800";
   if (status === "disabled" || status === "unchecked") {
     return "bg-slate-200 text-slate-700";
   }
@@ -149,10 +144,11 @@ export default function Home() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
+  const articleGroups = useMemo(() => groupArticles(articles), [articles]);
   const filteredArticles = useMemo(() => {
     const keyword = searchTerm.trim().toLowerCase();
 
-    return articles.filter((article) => {
+    return articleGroups.filter((group) => group.some((article) => {
       const matchesCategory =
         selectedCategory === "전체" ||
         article.category === selectedCategory;
@@ -170,21 +166,21 @@ export default function Home() {
       const matchesSearch = !keyword || searchableText.includes(keyword);
 
       return matchesCategory && matchesSearch;
-    });
-  }, [articles, searchTerm, selectedCategory]);
+    }));
+  }, [articleGroups, searchTerm, selectedCategory]);
 
   const categoryCounts = useMemo(() => {
     return {
-      전체: articles.length,
-      정치: articles.filter((article) => article.category === "정치").length,
-      안보: articles.filter((article) => article.category === "안보").length,
-      주택: articles.filter((article) => article.category === "주택").length,
-      경제: articles.filter((article) => article.category === "경제").length,
-      세계: articles.filter((article) => article.category === "세계").length,
-      NIC: articles.filter((article) => article.category === "NIC").length,
+      전체: articleGroups.length,
+      정치: articleGroups.filter(([article]) => article.category === "정치").length,
+      안보: articleGroups.filter(([article]) => article.category === "안보").length,
+      주택: articleGroups.filter(([article]) => article.category === "주택").length,
+      경제: articleGroups.filter(([article]) => article.category === "경제").length,
+      세계: articleGroups.filter(([article]) => article.category === "세계").length,
+      NIC: articleGroups.filter(([article]) => article.category === "NIC").length,
       선택: selectedIds.length,
     };
-  }, [articles, selectedIds]);
+  }, [articleGroups, selectedIds]);
 
   const toggleArticle = (id: number) => {
     setSelectedIds((current) =>
@@ -245,109 +241,24 @@ export default function Home() {
       setIsSaving(false);
     }
   };
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const generateWord = async () => {
-    const selectedArticles = articles.filter((article) =>
-      selectedIds.includes(article.id),
-    );
-
-    if (selectedArticles.length === 0) {
-      return;
-    }
-
-    const reportPeriod = dashboardMeta?.reportPeriod;
-    const children: Paragraph[] = [
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 120 },
-        children: [
-          new TextRun({
-            text: "이라크 주간정보보고",
-            bold: true,
-            size: 32,
-          }),
-        ],
-      }),
-      ...(reportPeriod ? [new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: { after: 360 },
-        children: [new TextRun({
-          text: `${reportPeriod.start} ~ ${reportPeriod.end}`,
-          size: 20,
-        })],
-      })] : []),
-    ];
-
-    selectedArticles.forEach((article) => {
-      children.push(
-        new Paragraph({
-          spacing: { before: 160, after: 100 },
-          children: [
-            new TextRun({
-              text: getDisplayTitle(article),
-              bold: true,
-              size: 22,
-            }),
-          ],
-        }),
-      );
-
-      article.summary.forEach((line) => {
-        children.push(
-          new Paragraph({
-            spacing: { after: 80 },
-            children: [
-              new TextRun({
-                text: line,
-                size: 20,
-              }),
-            ],
-          }),
-        );
-      });
-
-      children.push(
-        new Paragraph({
-          spacing: { after: 200 },
-          children: [new TextRun({ text: "" })],
-        }),
-      );
-    });
-
-    const document = new Document({
-      sections: [
-        {
-          children,
-        },
-      ],
-    });
-
-    const blob = await Packer.toBlob(document);
-    const url = URL.createObjectURL(blob);
-
-    const anchor = documentGlobalCreateAnchor(url);
-    anchor.click();
-
-    URL.revokeObjectURL(url);
-  };
-
-  const documentGlobalCreateAnchor = (url: string) => {
-    const anchor = window.document.createElement("a");
-    anchor.href = url;
-    anchor.download = `주간정보보고_${new Date()
-      .toISOString()
-      .slice(0, 10)}.docx`;
-
-    window.document.body.appendChild(anchor);
-
-    anchor.addEventListener(
-      "click",
-      () => {
-        window.document.body.removeChild(anchor);
-      },
-      { once: true },
-    );
-
-    return anchor;
+    if (isGenerating) return;
+    setIsGenerating(true); setExportError(null);
+    try {
+      const response = await fetch("/report-template.docx");
+      if (!response.ok) throw new Error("보고서 서식을 불러오지 못했습니다.");
+      const result = await createReport(articles.filter(article => selectedIds.includes(article.id)), await response.arrayBuffer());
+      const blob = new Blob([new Uint8Array(result.data)], {type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"});
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement("a");
+      anchor.href = url; anchor.download = result.filename;
+      window.document.body.appendChild(anchor); anchor.click(); anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "Word 파일을 생성하지 못했습니다. 다시 시도해 주세요.");
+    } finally { setIsGenerating(false); }
   };
 
   async function login() {
@@ -389,7 +300,7 @@ export default function Home() {
         {dashboardMeta && (
           <section className="mb-6 space-y-4">
             <div className="rounded-xl border border-blue-200 bg-blue-50 px-5 py-4"><p className="text-xs font-semibold text-blue-700">현재 보고 기간</p><p className="mt-1 text-lg font-bold text-blue-950">{dashboardMeta.reportPeriod.start} ~ {dashboardMeta.reportPeriod.end}</p><p className="mt-1 text-xs text-blue-800">목요일~수요일 · 바그다드 시간 기준</p></div>
-            <div className="grid gap-3 md:grid-cols-4">{[["보고서 후보", dashboardMeta.summary.included || 0], ["분석 대기", dashboardMeta.summary.pending || 0], ["본문·출처 확인 대기", dashboardMeta.summary.review || 0], ["제외·중복", (dashboardMeta.summary.excluded || 0) + (dashboardMeta.summary.duplicate || 0)]].map(([label, count]) => <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold">{count}</p></div>)}</div>
+            <div className="grid gap-3 md:grid-cols-4">{[["이번 주 후보 기사", dashboardMeta.summary.included || 0], ["분석 대기", dashboardMeta.summary.pending || 0], ["본문·출처 확인 대기", dashboardMeta.summary.review || 0], ["제외·중복", (dashboardMeta.summary.excluded || 0) + (dashboardMeta.summary.duplicate || 0)]].map(([label, count]) => <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-xl font-bold">{count}</p></div>)}</div>
             {dashboardMeta.analysisBudget && <p className="text-sm text-slate-600">
               매일 {dashboardMeta.analysisBudget.time} 자동 분석(바그다드) · 이번 달 예상 비용 {"$"}{dashboardMeta.analysisBudget.usedUsd.toFixed(2)} / {"$"}{dashboardMeta.analysisBudget.monthlyUsd.toFixed(2)}
               {dashboardMeta.analysisBudget.blocked && " · 예산 잔액 부족: 남은 기사는 분석 대기"}
@@ -472,14 +383,24 @@ export default function Home() {
             {saveNotice}
           </p>
         )}
-        <div className="mb-4 flex gap-2" aria-label="기사 기간 선택">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <div className="flex gap-2" aria-label="기사 기간 선택">
           {[['current', '이번 주 기사'], ['archive', '지난 기사']].map(([value, label]) => (
             <button key={value} aria-pressed={periodView === value} onClick={() => {
               if (periodView === value) return;
               setIsLoading(true); setLoadError(null); setArticles([]); setSelectedIds([]); setPeriodView(value);
             }} className={`rounded-lg px-4 py-2 text-sm ${periodView === value ? 'bg-slate-900 text-white' : 'bg-white border border-slate-300'}`}>{label}</button>
           ))}
+          </div>
+          <button
+            onClick={generateWord}
+            disabled={selectedIds.length === 0 || isGenerating}
+            className="ml-auto whitespace-nowrap rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+          >
+            {isGenerating ? "Word 생성 중…" : `선택 기사 ${selectedIds.length}건 Word 생성`}
+          </button>
         </div>
+        {exportError && <p role="alert" className="mb-3 text-sm text-red-700">{exportError}</p>}
         <h2 className="mb-3 text-lg font-bold">{periodView === 'current' ? '이번 주 보고서 후보' : '지난 보고서 후보'}</h2>
         <section className="space-y-3" aria-label="기사 목록" aria-busy={isLoading}>
           {isLoading && (
@@ -506,7 +427,10 @@ export default function Home() {
                 : "검색 조건에 맞는 기사가 없습니다. 검색어 또는 분류를 변경해 주세요."}
             </p>
           )}
-          {filteredArticles.map((article) => {
+          {articles.length > articleGroups.length && <p className="text-sm text-slate-600">후보 {articles.length}건을 {articleGroups.length}개 기사 묶음으로 표시 · 펼쳐서 매체별 내용 확인·선택 가능</p>}
+          {filteredArticles.map((group) => {
+            const article = group[0];
+            const sources = reportingSources(group);
             const isSelected = selectedIds.includes(article.id);
             const displayTitle = getDisplayTitle(article);
 
@@ -524,6 +448,7 @@ export default function Home() {
                   <input
                     type="checkbox"
                     checked={isSelected}
+                    aria-label={`${displayTitle} 선택`}
                     onChange={() => toggleArticle(article.id)}
                     className="mt-1 h-4 w-4"
                   />
@@ -538,6 +463,21 @@ export default function Home() {
                     </div>
 
                     <h2 className="text-base font-semibold">{displayTitle}</h2>
+                    {group.length > 1 && <details className="mt-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm">
+                      <summary className="cursor-pointer font-medium text-blue-800">{sources.length}개 언론사 보도{group.slice(1).some(item => selectedIds.includes(item.id)) ? " · 추가 기사 선택됨" : ""}</summary>
+                      <p className="mt-2 text-xs text-slate-600">{sources.join(" · ")} · 유사 제목 기준 묶음이며 독립 검증을 뜻하지 않습니다</p>
+                      {group.map(item => <div key={item.id} className="mt-3 border-t border-blue-100 pt-2">
+                        <label className="flex items-start gap-2">
+                          <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => toggleArticle(item.id)} className="mt-1" />
+                          <span><span className="text-xs text-slate-500">{item.source} · {item.date}</span><br />{getDisplayTitle(item)}</span>
+                        </label>
+                        {item.summary.map((line, index) => <p key={index} className="mt-1 text-xs leading-5 text-slate-700">{line}</p>)}
+                        <div className="mt-2 flex gap-3 text-xs text-blue-800">
+                          <button onClick={() => setOriginalArticle(item)}>원문보기</button>
+                          <button onClick={() => openEdit(item)}>편집</button>
+                        </div>
+                      </div>)}
+                    </details>}
 
 
                     {article.summary.length > 0 && (
@@ -575,15 +515,7 @@ export default function Home() {
           })}
         </section>
 
-        <div className="mt-6 flex justify-end">
-          <button
-            onClick={generateWord}
-            disabled={selectedIds.length === 0}
-            className="rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-          >
-            선택 기사 {selectedIds.length}건 Word 생성
-          </button>
-        </div>
+
       </div>
 
       {bodyArticle && <div role="dialog" aria-modal="true" aria-label="기사 본문 입력" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

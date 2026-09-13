@@ -3,10 +3,10 @@ import json
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from rss_to_db import fetch_entries
+from rss_to_db import fetch_entries, source_status
 from init_db import DB_PATH, ensure_schema
 from news_sources import NEWS_SOURCES
-from report_dates import BAGHDAD, article_date, report_week, today
+from report_dates import BAGHDAD, article_date
 
 def check(source):
     note = source.get('note', '')
@@ -17,7 +17,7 @@ def check(source):
             entries = fetch_entries(source)
             dates = [article_date(e.get('published') or e.get('updated'), None)[0] for e in entries]
             latest = max((d for d in dates if d), default=None)
-            status = 'stale' if latest and latest < report_week(today())[0] else 'metadata' if source.get('metadata_only') else 'ok'
+            status = source_status(source, latest)
             counts = {'discovered': len(entries)}
             note += ' | 제목 목록 점검만 수행, 본문 수집 미검증'
             if latest: note += ' | 최신 게시일 ' + latest
