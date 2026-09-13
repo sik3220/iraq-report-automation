@@ -150,6 +150,9 @@ def store_entry(connection, source, entry, collected, start, end):
         except Exception as error:
             reason = f"본문 수집 실패: {type(error).__name__}"
             status = "review"
+    if status == "excluded":
+        excerpt = ""
+        original = ""
     connection.execute(
         "INSERT INTO articles(source,category,title,summary,original,language,published_at,collected_at,url,"
         "report_status,report_reason,canonical_url,title_hash,report_date,date_basis,week_start,duplicate_of,region,excerpt) "
@@ -166,6 +169,14 @@ def save_rss_articles(week_of: str | None = None, selected_sources: list[str] | 
     all_results = []
     with closing(sqlite3.connect(DB_PATH)) as connection:
         ensure_schema(connection)
+        pruned = connection.execute(
+            "DELETE FROM articles WHERE report_status='excluded' AND week_start < ?", (start,),
+        ).rowcount
+        compacted = connection.execute(
+            "UPDATE articles SET original='',excerpt='' WHERE report_status='excluded' "
+            "AND (COALESCE(original,'')<>'' OR COALESCE(excerpt,'')<>'')"
+        ).rowcount
+        connection.commit()
         for source in NEWS_SOURCES:
             if selected_sources and source["id"] not in selected_sources:
                 continue
@@ -200,7 +211,7 @@ def save_rss_articles(week_of: str | None = None, selected_sources: list[str] | 
             result = dict(name=source["name"], status=status, note=note, counts=counts)
             all_results.append(result)
             print(json.dumps(result, ensure_ascii=False), flush=True)
-    return {"week_start": start, "week_end": end, "sources": all_results, "ai_calls": 0}
+    return {"week_start": start, "week_end": end, "sources": all_results, "pruned": pruned, "compacted": compacted, "ai_calls": 0}
 
 
 if __name__ == "__main__":

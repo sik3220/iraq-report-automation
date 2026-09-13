@@ -109,7 +109,7 @@ def filter_low_priority(week_of: str | None = None) -> int:
         ).fetchall()
         ids = [(article["id"],) for article in articles if not eligible(article)]
         connection.executemany(
-            "UPDATE articles SET report_status='excluded',report_reason='사전 분류: 중요도 기준 미달' WHERE id=?",
+            "UPDATE articles SET report_status='excluded',report_reason='사전 분류: 중요도 기준 미달',original='',excerpt='' WHERE id=?",
             ids,
         )
         connection.commit()
@@ -166,7 +166,7 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT,
             exclusion = pre_ai_exclusion_reason(article["title"] or "")
             if exclusion:
                 connection.execute(
-                    "UPDATE articles SET report_status='excluded',report_reason=? WHERE id=?",
+                    "UPDATE articles SET report_status='excluded',report_reason=?,original='',excerpt='' WHERE id=?",
                     (f"사전 분류: {exclusion}", article["id"]),
                 )
                 connection.commit()
@@ -194,8 +194,11 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT,
                     current_category=article["category"] or "미분류",
                 )
                 connection.execute(
-                    "UPDATE articles SET ai_title=?,summary=?,report_status=?,report_reason=?,category=? WHERE id=?",
-                    (report.title, report.summary, report.status, report.reason, category, article["id"]),
+                    "UPDATE articles SET ai_title=?,summary=?,report_status=?,report_reason=?,category=?,"
+                    "original=CASE WHEN ?='excluded' THEN '' ELSE original END,"
+                    "excerpt=CASE WHEN ?='excluded' THEN '' ELSE excerpt END WHERE id=?",
+                    (report.title, report.summary, report.status, report.reason, category,
+                     report.status, report.status, article["id"]),
                 )
                 connection.execute("UPDATE analysis_attempts SET status='complete' WHERE id=?", (attempt,))
                 connection.commit()

@@ -14,12 +14,32 @@ from report_style import normalize_summary
 from dedupe_review_articles import same_event
 from category_mapper import classify_category
 from article_scraper import fetch_article_text
-from rss_to_db import fetch_entries, source_status
+from rss_to_db import fetch_entries, save_rss_articles, source_status
 from run_job import run_recorded
 import process_articles as batch
 
 
 class ReportTests(unittest.TestCase):
+    def test_collection_prunes_only_old_excluded_articles(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "articles.db"
+            with closing(sqlite3.connect(path)) as db, db:
+                ensure_schema(db)
+                db.executemany(
+                    "INSERT INTO articles(id,title,report_status,week_start,original,date_basis) VALUES (?,?,?,?,?,?)",
+                    [
+                        (1, "old rejected", "excluded", "2026-09-03", "large body", "published"),
+                        (2, "current rejected", "excluded", "2026-09-10", "current body", "published"),
+                        (3, "old selected", "included", "2026-09-03", "selected body", "published"),
+                    ],
+                )
+            with patch("rss_to_db.DB_PATH", path), patch("rss_to_db.NEWS_SOURCES", []):
+                result = save_rss_articles("2026-09-13")
+            self.assertEqual(result["pruned"], 1)
+            self.assertEqual(result["compacted"], 1)
+            with closing(sqlite3.connect(path)) as db:
+                self.assertEqual(db.execute("SELECT id,original FROM articles ORDER BY id").fetchall(), [(2, ""), (3, "selected body")])
+
     def test_sqlite_uses_wal_and_waits_for_scheduled_writes(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "articles.db"
@@ -44,14 +64,14 @@ class ReportTests(unittest.TestCase):
             backup_dir.mkdir()
             for number in range(20):
                 (backup_dir / f"articles-20260101-000000-{number:06}.db").write_bytes(b"old")
-            report = SimpleNamespace(title="이라크, 석유 투자 추진", summary="", status="included", reason="경제")
+            report = SimpleNamespace(title="이라크, 석유 투자 추진", summary="", status="excluded", reason="중요도 미달")
             with patch.object(batch, "DB_PATH", path), patch.object(batch, "today", return_value="2026-09-13"), patch.object(
                 batch, "dedupe_review_articles"
             ), patch.object(batch, "analyze_article", return_value=report):
                 self.assertEqual(batch.process_articles(), 0)
                 self.assertEqual(batch.process_articles(), 0)
             with closing(sqlite3.connect(path)) as db:
-                self.assertEqual(db.execute("SELECT id,report_status FROM articles ORDER BY id").fetchall(), [(1, "included"), (2, "pending")])
+                self.assertEqual(db.execute("SELECT id,report_status,original FROM articles ORDER BY id").fetchall(), [(1, "excluded", ""), (2, "pending", "old body")])
             self.assertEqual(len(list(backup_dir.glob("articles-*.db"))), 20)
             self.assertFalse((backup_dir / "articles-20260101-000000-000000.db").exists())
 
@@ -119,6 +139,8 @@ class ReportTests(unittest.TestCase):
                         ("Community event", "Shafaq", "review", "2026-09-03", "published"),
                     ],
                 )
+            with closing(sqlite3.connect(path)) as db, db:
+                db.execute("UPDATE articles SET original='body',excerpt='excerpt'")
             with patch.object(batch, "DB_PATH", path):
                 self.assertEqual(batch.filter_low_priority("2026-09-08"), 2)
             with closing(sqlite3.connect(path)) as db:
@@ -126,6 +148,7 @@ class ReportTests(unittest.TestCase):
                     db.execute("SELECT report_status,COUNT(*) FROM articles GROUP BY report_status ORDER BY report_status").fetchall(),
                     [("excluded", 2), ("pending", 1), ("review", 1)],
                 )
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM articles WHERE report_status='excluded' AND (original<>'' OR excerpt<>'')").fetchone()[0], 0)
 
     def test_names_single_pass_and_idempotent(self):
         text = "Donald Trump, Trump 대통령, 트럼프"
