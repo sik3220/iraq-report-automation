@@ -49,6 +49,25 @@ def request_page(url):
 
 def fetch_entries(source):
     response = request_page(source["url"])
+    if source["type"] == "telegram":
+        soup = BeautifulSoup(response.content, "html.parser")
+        result = []
+        for post in soup.select(".tgme_widget_message_wrap"):
+            message = post.select_one("[data-post]")
+            body = post.select_one(".tgme_widget_message_text")
+            stamp = post.select_one("time[datetime]")
+            if not message or not body or not stamp:
+                continue
+            text = body.get_text("\n", strip=True)
+            lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines() if line.strip()]
+            post_id = message.get("data-post", "")
+            title = next((line for line in lines if len(line) >= 12), "")
+            if title and post_id:
+                result.append(dict(title=title[:300], link=f"https://t.me/{post_id}",
+                                   published=stamp.get("datetime", ""), summary=text[:1200], _body=text[:20000]))
+        if not result:
+            raise ValueError("텔레그램 공개 게시물이 비어 있음")
+        return result[:MAX_ENTRIES]
     if source["type"] == "discover_rss":
         soup = BeautifulSoup(response.content, "html.parser")
         links = soup.select('link[type="application/rss+xml"][href]')
@@ -121,11 +140,11 @@ def store_entry(connection, source, entry, collected, start, end):
     status = "duplicate" if duplicate else "excluded" if is_low_priority else "pending"
     reason = "동일 날짜·동일 제목 — 대표 기사 연결" if duplicate else "사전 분류: 스포츠·연예·생활 섹션" if is_low_priority else ""
     excerpt = BeautifulSoup(entry.get("summary", ""), "html.parser").get_text(" ", strip=True)[:1200]
-    original = ""
+    original = entry.get("_body", "")
     if status == "pending" and source.get("metadata_only"):
         status = "review"
         reason = source.get("note", "제목·요약만 수집 — 본문 확인 필요")
-    if status == "pending":
+    if status == "pending" and not original:
         try:
             original = fetch_article_text(url)
         except Exception as error:

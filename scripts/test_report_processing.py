@@ -13,12 +13,26 @@ from report_style import normalize_summary
 from dedupe_review_articles import same_event
 from category_mapper import classify_category
 from article_scraper import fetch_article_text
-from rss_to_db import source_status
+from rss_to_db import fetch_entries, source_status
 from run_job import run_recorded
 import process_articles as batch
 
 
 class ReportTests(unittest.TestCase):
+    def test_nic_telegram_extracts_public_post_body(self):
+        html = '''<div class="tgme_widget_message_wrap"><div class="tgme_widget_message"
+                  data-post="investpromo_gov_iq/3421"><div class="tgme_widget_message_text">
+                  🟢\nالهيئة الوطنية للاستثمار تعلن فرصة استثمارية\nتفاصيل المشروع</div>
+                  <time datetime="2026-09-11T11:38:33+00:00"></time></div></div>'''
+        response = type("Response", (), {"content": html.encode("utf-8")})()
+        source = {"type": "telegram", "url": "https://t.me/s/investpromo_gov_iq"}
+        with patch("rss_to_db.request_page", return_value=response):
+            entry = fetch_entries(source)[0]
+        self.assertEqual(entry["title"], "الهيئة الوطنية للاستثمار تعلن فرصة استثمارية")
+        self.assertEqual(entry["link"], "https://t.me/investpromo_gov_iq/3421")
+        self.assertEqual(entry["published"], "2026-09-11T11:38:33+00:00")
+        self.assertIn("تفاصيل المشروع", entry["_body"])
+
     def test_job_harness_records_success_and_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "articles.db"
