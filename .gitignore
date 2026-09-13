@@ -45,6 +45,7 @@ __pycache__/
 *.pyc
 # Local runtime data
 /data/articles.db
+/data/articles.db-*
 
 # Local article backups
 /data/backups/

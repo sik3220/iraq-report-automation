@@ -13,6 +13,7 @@ from news_dedup import normalized_text
 from news_sources import NEWS_SOURCES
 
 DEFAULT_LIMIT = None
+MAX_BACKUPS = 20
 MIN_PRIORITY_SCORE = 11
 PRIORITY_TERMS = {
     "이라크": 8, "iraq": 8, "العراق": 8,
@@ -25,7 +26,7 @@ PRIORITY_TERMS = {
     "정부": 3, "government": 3, "حكومة": 3,
     "مجلس النواب": 6, "رئيس الوزراء": 5, "وزير الخارجية": 4,
     "الحشد الشعبي": 6, "داعش": 8, "الداخلية": 4,
-    "استثمار": 5, "سكن": 5, "اقتصادي": 5,
+    "استثمار": 5, "مستثمر": 5, "سكن": 5, "اقتصادي": 5,
     "لبنان": 4, "إسرائيل": 4, "اليمن": 4,
     "israel": 4, "lebanon": 4, "yemen": 4, "gaza": 4,
     "الإطار التنسيقي": 7,
@@ -116,27 +117,21 @@ def filter_low_priority(week_of: str | None = None) -> int:
 
 
 def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT, week_of: str | None = None) -> int:
+    target_week = week_of or (None if reprocess else today())
     if not reprocess:
-        filter_low_priority(week_of)
-        dedupe_review_articles(week_of)
-    connection = sqlite3.connect(DB_PATH)
+        filter_low_priority(target_week)
+        dedupe_review_articles(target_week)
+    connection = sqlite3.connect(DB_PATH, timeout=30)
     connection.row_factory = sqlite3.Row
     try:
-        # Snapshot before schema migration and before replacing existing report text.
-        backup_dir = DB_PATH.parent / "backups"
-        backup_dir.mkdir(exist_ok=True)
-        backup_path = backup_dir / f"articles-{datetime.now():%Y%m%d-%H%M%S-%f}.db"
-        with closing(sqlite3.connect(backup_path)) as backup:
-            connection.backup(backup)
-        print(f"백업: {backup_path}", flush=True)
         ensure_schema(connection)
         conditions = []
         parameters: list[str] = []
         if not reprocess:
             conditions.append("report_status = 'pending'")
-        if week_of:
+        if target_week:
             from report_dates import report_week
-            week_start, _ = report_week(week_of)
+            week_start, _ = report_week(target_week)
             conditions.append("week_start = ?")
             parameters.append(week_start)
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
@@ -155,6 +150,17 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT,
         articles = ranked[:limit] if limit is not None else ranked
         failures = 0
         counts = {"included": 0, "excluded": 0, "review": 0}
+        if not articles:
+            print(f"처리 결과: {counts}, 실패 0건", flush=True)
+            return 0
+        backup_dir = DB_PATH.parent / "backups"
+        backup_dir.mkdir(exist_ok=True)
+        backup_path = backup_dir / f"articles-{datetime.now():%Y%m%d-%H%M%S-%f}.db"
+        with closing(sqlite3.connect(backup_path)) as backup:
+            connection.backup(backup)
+        for old in sorted(backup_dir.glob("articles-*.db"))[:-MAX_BACKUPS]:
+            old.unlink()
+        print(f"백업: {backup_path}", flush=True)
         for index, article in enumerate(articles, start=1):
             print(f"[{index}/{len(articles)}] 기사 {article['id']} 처리 중", flush=True)
             exclusion = pre_ai_exclusion_reason(article["title"] or "")

@@ -9,6 +9,9 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "articles.db"
 
 
 def ensure_schema(connection: sqlite3.Connection) -> None:
+    connection.execute("PRAGMA busy_timeout=30000")
+    if not connection.in_transaction:
+        connection.execute("PRAGMA journal_mode=WAL")
     connection.execute("""
         CREATE TABLE IF NOT EXISTS articles (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

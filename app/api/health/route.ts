@@ -7,7 +7,7 @@ export function GET() {
   const dbPath = path.join(process.cwd(), "data", "articles.db");
   let db: Database.Database | undefined;
   try {
-    db = new Database(dbPath, { readonly: true });
+    db = new Database(dbPath, { readonly: true, timeout: 30000 });
     db.prepare("SELECT 1").get();
     return Response.json({ status: "ok", database: "ok" });
   } catch {

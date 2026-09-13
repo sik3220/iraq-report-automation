@@ -36,7 +36,7 @@ def world_priority_score(title, excerpt):
 
 def source_status(source, latest, reference_day=None):
     """Separate a working limited feed from a feed that has actually stopped updating."""
-    if latest and (date.fromisoformat(reference_day or today()) - date.fromisoformat(latest)).days >= 3:
+    if latest and (date.fromisoformat(reference_day or today()) - date.fromisoformat(latest)).days >= source.get("stale_after_days", 3):
         return "stale"
     return "metadata" if source.get("metadata_only") else "ok"
 

@@ -17,7 +17,7 @@ NEWS_SOURCES = [
          enabled=True, body_fetch_review=True,
          note="공식 홈페이지 최신 기사 목록·본문 자동 수집 — 접근 실패 기사만 검토 대기"),
     dict(id="nic_telegram", name="NIC 공식 Telegram", type="telegram", language="ar", region="이라크", category="NIC",
-         url="https://t.me/s/investpromo_gov_iq", enabled=True,
+         url="https://t.me/s/investpromo_gov_iq", enabled=True, stale_after_days=14,
          note="NIC 공식 텔레그램 공개 게시물·본문 자동 수집"),
     dict(id="shafaq", name="Shafaq", type="rss", language="ar", region="이라크", category="미분류",
          url="https://shafaq.com/ar?rss=1", enabled=True),

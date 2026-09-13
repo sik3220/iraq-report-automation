@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from ai_processor import parse_report
@@ -19,6 +20,41 @@ import process_articles as batch
 
 
 class ReportTests(unittest.TestCase):
+    def test_sqlite_uses_wal_and_waits_for_scheduled_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "articles.db"
+            with closing(sqlite3.connect(path)) as db:
+                ensure_schema(db)
+                self.assertEqual(db.execute("PRAGMA journal_mode").fetchone()[0], "wal")
+                self.assertEqual(db.execute("PRAGMA busy_timeout").fetchone()[0], 30000)
+
+    def test_default_analysis_only_current_week_and_limits_backups(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "articles.db"
+            with closing(sqlite3.connect(path)) as db, db:
+                ensure_schema(db)
+                db.executemany(
+                    "INSERT INTO articles(id,title,source,original,report_status,week_start,collected_at,region,category) VALUES (?,?,?,?,?,?,?,?,?)",
+                    [
+                        (1, "Iraq oil investment", "INA", "current body", "pending", "2026-09-10", "2026-09-13", "이라크", "경제"),
+                        (2, "Iraq oil investment", "INA", "old body", "pending", "2026-09-03", "2026-09-06", "이라크", "경제"),
+                    ],
+                )
+            backup_dir = path.parent / "backups"
+            backup_dir.mkdir()
+            for number in range(20):
+                (backup_dir / f"articles-20260101-000000-{number:06}.db").write_bytes(b"old")
+            report = SimpleNamespace(title="이라크, 석유 투자 추진", summary="", status="included", reason="경제")
+            with patch.object(batch, "DB_PATH", path), patch.object(batch, "today", return_value="2026-09-13"), patch.object(
+                batch, "dedupe_review_articles"
+            ), patch.object(batch, "analyze_article", return_value=report):
+                self.assertEqual(batch.process_articles(), 0)
+                self.assertEqual(batch.process_articles(), 0)
+            with closing(sqlite3.connect(path)) as db:
+                self.assertEqual(db.execute("SELECT id,report_status FROM articles ORDER BY id").fetchall(), [(1, "included"), (2, "pending")])
+            self.assertEqual(len(list(backup_dir.glob("articles-*.db"))), 20)
+            self.assertFalse((backup_dir / "articles-20260101-000000-000000.db").exists())
+
     def test_nic_telegram_extracts_public_post_body(self):
         html = '''<div class="tgme_widget_message_wrap"><div class="tgme_widget_message"
                   data-post="investpromo_gov_iq/3421"><div class="tgme_widget_message_text">
@@ -51,6 +87,9 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(source_status(full, "2026-09-09", "2026-09-10"), "ok")
         self.assertEqual(source_status(limited, "2026-09-09", "2026-09-10"), "metadata")
         self.assertEqual(source_status(full, "2026-09-07", "2026-09-10"), "stale")
+        occasional = {"stale_after_days": 14}
+        self.assertEqual(source_status(occasional, "2026-09-01", "2026-09-10"), "ok")
+        self.assertEqual(source_status(occasional, "2026-08-27", "2026-09-10"), "stale")
 
     def test_article_body_itemprop_fallback(self):
         body = "هذا نص خبري طويل يشرح تفاصيل القرار الحكومي وآثاره الاقتصادية على العراق " * 5
@@ -112,6 +151,7 @@ class ReportTests(unittest.TestCase):
         for title in ("مجلس النواب يناقش قانون الانتخابات", "هيئة الاستثمار تعلن المدن الجديدة",
                       "الحلبوسي يترأس مباحثات برلمانية", "القوات الأمنية تحمي الحدود"):
             self.assertTrue(batch.eligible({"title": title, "source": "INA"}), title)
+        self.assertTrue(batch.eligible({"title": "تسهيلات جديدة لدعم المستثمرين في العراق", "source": "NIC 공식 Telegram"}))
         self.assertTrue(batch.eligible({"title": "US and Iran trade attacks on ships", "source": "BBC"}))
         self.assertFalse(batch.eligible({"title": "Egypt drugs case", "source": "BBC"}))
 

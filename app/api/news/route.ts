@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const dbPath = path.join(process.cwd(), "data", "articles.db");
   let db: Database.Database | undefined;
   try {
-    db = new Database(dbPath, { readonly: true });
+    db = new Database(dbPath, { readonly: true, timeout: 30000 });
     const period = currentReportWeek();
     const archive = new URL(request.url).searchParams.get("period") === "archive";
     const periodFilter = archive ? "week_start < ?" : "week_start = ?";
@@ -86,7 +86,7 @@ export async function PATCH(request: Request) {
     if (!Number.isSafeInteger(input.id) || input.id < 1 || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0 || typeof input.body !== "string" || input.body.trim().length < 100 || input.body.length > 100000) {
       return Response.json({ success: false, error: "기사 본문을 100~100,000자로 입력해 주세요." }, { status: 400 });
     }
-    const connection = new Database(path.join(process.cwd(), "data", "articles.db"), { fileMustExist: true });
+    const connection = new Database(path.join(process.cwd(), "data", "articles.db"), { fileMustExist: true, timeout: 30000 });
     try {
       const result = connection.prepare("UPDATE articles SET original = ?, report_status = 'pending', report_reason = '사용자 본문 입력 — 분석 대기', edit_revision = edit_revision + 1 WHERE id = ? AND edit_revision = ? AND report_status = 'review' AND COALESCE(original, '') = ''").run(input.body.trim(), input.id, input.expectedRevision);
       return Response.json({ success: result.changes === 1, error: result.changes ? undefined : "기사 상태가 변경됐습니다. 새로고침 후 확인해 주세요." }, { status: result.changes ? 200 : 409 });
@@ -113,7 +113,7 @@ export async function PATCH(request: Request) {
 
   let db: Database.Database | undefined;
   try {
-    db = new Database(path.join(process.cwd(), "data", "articles.db"), { fileMustExist: true });
+    db = new Database(path.join(process.cwd(), "data", "articles.db"), { fileMustExist: true, timeout: 30000 });
     // Separate overrides preserve the source/AI text and survive AI reprocessing.
     const article = db.prepare(
       `UPDATE articles
