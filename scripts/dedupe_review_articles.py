@@ -1,7 +1,7 @@
 """Conservative same-day duplicate removal; preserve changed facts and user edits."""
 import re
 from contextlib import closing
-import sqlite3
+import database as sqlite3
 from init_db import DB_PATH, ensure_schema
 from news_dedup import normalized_text
 from report_dates import report_week, today

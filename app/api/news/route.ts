@@ -1,10 +1,14 @@
 import Database from "better-sqlite3";
+import postgres from "postgres";
 import path from "path";
 import fs from "node:fs";
 import { normalizeReportLine, summaryLines } from "../../report-format";
 import { isAuthenticated } from "../../lib/auth";
 
 export const dynamic = "force-dynamic";
+
+const databaseUrl = process.env?.DATABASE_URL;
+const remoteDb = databaseUrl ? postgres(databaseUrl, { max: 1, prepare: false, ssl: "require" }) : null;
 
 function currentReportWeek() {
   const date = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Baghdad", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -15,8 +19,41 @@ function currentReportWeek() {
   return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
 }
 
+async function getRemoteNews(request: Request) {
+  if (!remoteDb) throw new Error("DATABASE_URL이 없습니다");
+  const period = currentReportWeek();
+  const archive = new URL(request.url).searchParams.get("period") === "archive";
+  const needsBody = await remoteDb`SELECT id,source,title,url,report_date,edit_revision FROM articles WHERE report_status='review' AND COALESCE(original,'')='' AND week_start=${period.start} ORDER BY report_date DESC`;
+  const articles = archive
+    ? await remoteDb`SELECT id,category,source,title,COALESCE(edited_title,ai_title) AS ai_title,COALESCE(edited_summary,summary) AS summary,edit_revision,original,published_at,report_date,collected_at,url FROM articles WHERE report_status='included' AND week_start<${period.start} ORDER BY collected_at DESC`
+    : await remoteDb`SELECT id,category,source,title,COALESCE(edited_title,ai_title) AS ai_title,COALESCE(edited_summary,summary) AS summary,edit_revision,original,published_at,report_date,collected_at,url FROM articles WHERE report_status='included' AND week_start=${period.start} ORDER BY collected_at DESC`;
+  const summaryRows = await remoteDb`SELECT report_status AS status,COUNT(*)::int AS count FROM articles WHERE week_start=${period.start} GROUP BY report_status`;
+  const summary: Record<string, number> = {};
+  summaryRows.forEach((row) => { summary[String(row.status)] = Number(row.count); });
+  const [testData] = await remoteDb`SELECT COUNT(*)::int AS count FROM articles WHERE url='https://test.com' AND report_status='excluded'`;
+  const sourceRows = await remoteDb`SELECT source_id,name,status,note,checked_at,counts FROM source_checks ORDER BY name`;
+  const sources = sourceRows.map((row) => ({ ...row, counts: row.counts ? JSON.parse(String(row.counts)) : {} }));
+  const operations = await remoteDb`SELECT r.job,r.status,r.started_at,r.finished_at,r.detail,(SELECT MAX(s.finished_at) FROM job_runs s WHERE s.job=r.job AND s.status='success') AS last_success FROM job_runs r WHERE r.id=(SELECT MAX(latest.id) FROM job_runs latest WHERE latest.job=r.job) ORDER BY r.job`;
+  let analysisBudget = null;
+  const configPath = path.join(process.cwd(), "deploy", "analysis-settings.json");
+  if (fs.existsSync(configPath)) {
+    const settings = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    const day = new Intl.DateTimeFormat("en-CA", {timeZone:"Asia/Baghdad",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+    const [usage] = await remoteDb`SELECT COALESCE(SUM(COALESCE(charged,reserved)),0)::bigint AS total FROM ai_spend WHERE substr(day,1,7)=${day.slice(0,7)}`;
+    const [state] = await remoteDb`SELECT blocked FROM ai_budget_state WHERE day=${day}`;
+    analysisBudget = { usedUsd: Number(usage.total) / 1000000, monthlyUsd: settings.monthly_usd, blocked: Boolean(state?.blocked), time: settings.time_baghdad };
+  }
+  return Response.json({ success: true, count: articles.length, articles, needsBody, meta: { reportPeriod: period, summary, testDataCount: Number(testData.count), sources, operations, analysisBudget } });
+}
 export async function GET(request: Request) {
   if (!isAuthenticated(request)) return Response.json({ success: false, error: "로그인이 필요합니다." }, { status: 401 });
+  if (remoteDb) {
+    try { return await getRemoteNews(request); }
+    catch (error) {
+      console.error("Failed to load articles:", error);
+      return Response.json({ success: false, error: "기사를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
+    }
+  }
   const dbPath = path.join(process.cwd(), "data", "articles.db");
   let db: Database.Database | undefined;
   try {
@@ -68,6 +105,7 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   if (!isAuthenticated(request)) return Response.json({ success: false, error: "로그인이 필요합니다." }, { status: 401 });
+
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) {
     return Response.json({ success: false, error: "허용되지 않은 요청입니다." }, { status: 403 });
@@ -85,6 +123,15 @@ export async function PATCH(request: Request) {
   if (input?.action === "provide_body") {
     if (!Number.isSafeInteger(input.id) || input.id < 1 || !Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0 || typeof input.body !== "string" || input.body.trim().length < 100 || input.body.length > 100000) {
       return Response.json({ success: false, error: "기사 본문을 100~100,000자로 입력해 주세요." }, { status: 400 });
+    }
+    if (remoteDb) {
+      try {
+        const rows = await remoteDb`UPDATE articles SET original=${input.body.trim()},report_status='pending',report_reason='사용자 본문 입력 — 분석 대기',edit_revision=edit_revision+1 WHERE id=${input.id} AND edit_revision=${input.expectedRevision} AND report_status='review' AND COALESCE(original,'')='' RETURNING id`;
+        return Response.json({ success: rows.length === 1, error: rows.length ? undefined : "기사 상태가 변경됐습니다. 새로고침 후 확인해 주세요." }, { status: rows.length ? 200 : 409 });
+      } catch (error) {
+        console.error("Failed to save article body:", error);
+        return Response.json({ success: false, error: "본문을 저장하지 못했습니다." }, { status: 500 });
+      }
     }
     const connection = new Database(path.join(process.cwd(), "data", "articles.db"), { fileMustExist: true, timeout: 30000 });
     try {
@@ -111,6 +158,17 @@ export async function PATCH(request: Request) {
     return Response.json({ success: false, error: "제목을 입력해 주세요." }, { status: 400 });
   }
 
+  if (remoteDb) {
+    try {
+      const rows = await remoteDb`UPDATE articles SET edited_title=${title},edited_summary=${summary},edit_revision=edit_revision+1 WHERE id=${input.id} AND report_status='included' AND edit_revision=${input.expectedRevision} RETURNING id,edited_title AS ai_title,edited_summary AS summary,edit_revision`;
+      if (rows[0]) return Response.json({ success: true, article: rows[0] });
+      const exists = await remoteDb`SELECT id FROM articles WHERE id=${input.id} AND report_status='included'`;
+      return Response.json({ success: false, error: exists.length ? "다른 화면에서 먼저 수정한 기사입니다. 입력 내용을 복사한 뒤 새로고침하여 최신 문안을 확인해 주세요." : "저장할 보고서 후보 기사를 찾을 수 없습니다." }, { status: exists.length ? 409 : 404 });
+    } catch (error) {
+      console.error("Failed to save article:", error);
+      return Response.json({ success: false, error: "저장하지 못했습니다. 입력 내용은 유지됩니다. 잠시 후 다시 시도해 주세요." }, { status: 500 });
+    }
+  }
   let db: Database.Database | undefined;
   try {
     db = new Database(path.join(process.cwd(), "data", "articles.db"), { fileMustExist: true, timeout: 30000 });

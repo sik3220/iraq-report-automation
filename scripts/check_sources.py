@@ -1,6 +1,6 @@
 """Check source metadata without fetching article bodies or calling AI."""
 import json
-import sqlite3
+import database as sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from rss_to_db import fetch_entries, source_status

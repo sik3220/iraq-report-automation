@@ -1,4 +1,4 @@
-import sqlite3
+import database as sqlite3
 
 conn = sqlite3.connect("data/articles.db")
 cursor = conn.cursor()

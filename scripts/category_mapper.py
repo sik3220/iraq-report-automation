@@ -1,6 +1,6 @@
 """Assign Iraq report categories without making an AI call."""
 from contextlib import closing
-import sqlite3
+import database as sqlite3
 
 from init_db import DB_PATH, ensure_schema
 

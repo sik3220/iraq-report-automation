@@ -2,7 +2,7 @@
 import argparse
 import json
 import re
-import sqlite3
+import database as sqlite3
 from contextlib import closing
 from datetime import date, datetime
 from urllib.parse import urljoin, urlsplit

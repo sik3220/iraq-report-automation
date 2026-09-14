@@ -1,6 +1,6 @@
 """Record one scheduled job without changing the job's implementation."""
 import argparse
-import sqlite3
+import database as sqlite3
 import subprocess
 import sys
 from contextlib import closing
@@ -16,9 +16,9 @@ def run_recorded(job: str, command: list[str], db_path: Path = DB_PATH) -> int:
     with closing(sqlite3.connect(db_path)) as connection, connection:
         ensure_schema(connection)
         run_id = connection.execute(
-            "INSERT INTO job_runs(job,started_at,status) VALUES (?,?,'running')",
+            "INSERT INTO job_runs(job,started_at,status) VALUES (?,?,'running') RETURNING id",
             (job, started),
-        ).lastrowid
+        ).fetchone()[0]
         connection.commit()
     try:
         result = subprocess.run([sys.executable, "-X", "utf8", *command], check=False)

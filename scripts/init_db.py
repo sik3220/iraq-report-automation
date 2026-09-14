@@ -1,5 +1,5 @@
 from contextlib import closing
-import sqlite3
+import database as sqlite3
 from pathlib import Path
 from report_dates import article_date, report_week
 from news_dedup import canonical_url, title_hash
@@ -9,6 +9,17 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "articles.db"
 
 
 def ensure_schema(connection: sqlite3.Connection) -> None:
+    if sqlite3.is_postgres(connection):
+        schema = (Path(__file__).resolve().parent.parent / "supabase/migrations/20260914000000_initial.sql").read_text(encoding="utf-8")
+        connection.execute(schema)
+        for source in NEWS_SOURCES:
+            connection.execute(
+                "INSERT INTO source_checks(source_id,name,status,note,checked_at,counts) VALUES (?,?,?,?,NULL,'{}') "
+                "ON CONFLICT(source_id) DO NOTHING",
+                (source["id"], source["name"], "unchecked" if source["enabled"] else "disabled", source.get("note", "수집 실행 이력 없음"))
+            )
+        connection.commit()
+        return
     connection.execute("PRAGMA busy_timeout=30000")
     if not connection.in_transaction:
         connection.execute("PRAGMA journal_mode=WAL")

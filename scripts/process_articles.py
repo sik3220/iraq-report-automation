@@ -1,6 +1,6 @@
 from contextlib import closing
 import argparse
-import sqlite3
+import database as sqlite3
 from datetime import datetime
 
 from ai_processor import analyze_article
@@ -140,6 +140,7 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT,
             "ORDER BY collected_at DESC",
             parameters,
         ).fetchall()
+        connection.commit()
         ranked = sorted(
             articles,
             key=lambda article: (priority_score(article), article["collected_at"] or ""),
@@ -153,14 +154,15 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT,
         if not articles:
             print(f"처리 결과: {counts}, 실패 0건", flush=True)
             return 0
-        backup_dir = DB_PATH.parent / "backups"
-        backup_dir.mkdir(exist_ok=True)
-        backup_path = backup_dir / f"articles-{datetime.now():%Y%m%d-%H%M%S-%f}.db"
-        with closing(sqlite3.connect(backup_path)) as backup:
-            connection.backup(backup)
-        for old in sorted(backup_dir.glob("articles-*.db"))[:-MAX_BACKUPS]:
-            old.unlink()
-        print(f"백업: {backup_path}", flush=True)
+        if not sqlite3.is_postgres(connection):
+            backup_dir = DB_PATH.parent / "backups"
+            backup_dir.mkdir(exist_ok=True)
+            backup_path = backup_dir / f"articles-{datetime.now():%Y%m%d-%H%M%S-%f}.db"
+            with closing(sqlite3.connect(backup_path)) as backup:
+                connection.backup(backup)
+            for old in sorted(backup_dir.glob("articles-*.db"))[:-MAX_BACKUPS]:
+                old.unlink()
+            print(f"백업: {backup_path}", flush=True)
         for index, article in enumerate(articles, start=1):
             print(f"[{index}/{len(articles)}] 기사 {article['id']} 처리 중", flush=True)
             exclusion = pre_ai_exclusion_reason(article["title"] or "")
@@ -182,8 +184,8 @@ def process_articles(reprocess: bool = False, limit: int | None = DEFAULT_LIMIT,
                 connection.rollback()
                 continue
             attempt = connection.execute(
-                "INSERT INTO analysis_attempts(article_id,day,status) VALUES (?,?,'started')",
-                (article["id"],today())).lastrowid
+                "INSERT INTO analysis_attempts(article_id,day,status) VALUES (?,?,'started') RETURNING id",
+                (article["id"],today())).fetchone()[0]
             connection.commit()
             try:
                 report = analyze_article(article["title"] or "", article["original"] or "")

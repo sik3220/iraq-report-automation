@@ -1,6 +1,6 @@
 """Retry body collection for review articles from publishers that allow direct access."""
 import argparse
-import sqlite3
+import database as sqlite3
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from article_scraper import fetch_article_text

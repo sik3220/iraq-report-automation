@@ -1,4 +1,4 @@
-import sqlite3
+import database as sqlite3
 from datetime import datetime
 
 # DB 연결
